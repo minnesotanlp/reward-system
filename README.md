@@ -1,5 +1,5 @@
-# Temporary Title
-## ReWARD: Recording Writer Actions for Rhetorical aDjustments 
+# Decoding the End-to-end Writing Trajectory in Scholarly
+Manuscripts
 
 ### Requirements
 You will need to install flask==2.1.3, werkzeug==2.1.2, and flask-restx. Installing flask may automatically install a newer version of werkzeug. Werkzeug can be downgraded by running `pip install werkzeug==2.1.2`.

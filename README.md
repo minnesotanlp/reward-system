@@ -2,11 +2,13 @@
 
 This repository provides Chrome extension and annotation code of the following paper:
 
-> [Decoding the End-to-end Writing Trajectory in Scholarly Manuscripts](https://arxiv.org/abs/2301.05036) <br>
+> [Decoding the End-to-end Writing Trajectory in Scholarly Manuscripts]() <br>
 > Ryan Hyunkyo Koo, 
 Anna Martin, 
 Linghe Wang, Dongyeop Kang <br>
 > [The Second Workshop on Intelligent and Interactive Writing Assistants (In2writing)](https://in2writing.glitch.me/) <br>
+> [Demo](https://minnesotanlp.github.io/REWARD_demo/)
+
 
 
 ### Requirements

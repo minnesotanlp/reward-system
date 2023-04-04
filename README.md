@@ -2,7 +2,7 @@
 
 This repository provides Chrome extension and annotation code of the following paper:
 
-> [Decoding the End-to-end Writing Trajectory in Scholarly Manuscripts]() <br>
+> [Decoding the End-to-end Writing Trajectory in Scholarly Manuscripts](https://arxiv.org/pdf/2304.00121.pdf) <br>
 > Ryan Hyunkyo Koo, 
 Anna Martin, 
 Linghe Wang, Dongyeop Kang <br>

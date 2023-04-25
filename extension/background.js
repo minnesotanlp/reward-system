@@ -26,13 +26,24 @@ chrome.runtime.onMessage.addListener(
         text = text.filter(function(element) {return element !== undefined;});
         projectID = request.project_id
         filename = request.editingFile;
+        if (request.message == "user_selection"){
+            var d = new Date();
+            var ms = d.getMilliseconds();
+            var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
+            if (request.accept == false){
+                postWriterText({state: "user_selection",timestamp: time, accept: false});
+            }
+            else{
+                postWriterText({state: "user_selection",timestamp: time, accept: true});
+            }
+        }
         if (request.message == "assist"){
             var d = new Date();
             var ms = d.getMilliseconds();
             var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
             postWriterText({state: "assist",timestamp: time, project: projectID, file: filename, pre_content: request.pre_content,
             pos_content: request.pos_content, selected_text: request.selected_text, current_content: request.current_line_content,
-            current_line_content: request.current_line_content, line: request.line});
+            line: request.line});
             generateText();
         }
         else{
@@ -41,9 +52,8 @@ chrome.runtime.onMessage.addListener(
         if (request.message == "listeners") {
             // process edits, find the diff, as additions or deletions
            console.log("***** press *****");
+           console.log(request)
            text.push(request.text);
-           console.log(text)
-           console.log(request.revisions);
            if (prelineNumber == null){
                prelineNumber = lineNumber;
            }

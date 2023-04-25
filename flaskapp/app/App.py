@@ -1,12 +1,16 @@
-import os
-import sys
+import time
 from flask import Flask, request, jsonify
-from flask_pymongo import PyMongo
 from flask_restx import Api, Resource, fields
-from nltk.tokenize import sent_tokenize, word_tokenize
+import warnings
+from dataclasses import dataclass
+from typing import List, Tuple
+import minichain
+import os
+import diff_match_patch as dmp_module
+dmp = dmp_module.diff_match_patch()
 
-import nltk
-nltk.download('punkt')
+import spacy
+sent_tokenizer = spacy.load("en_core_web_sm")
 
 application = Flask(__name__)
 app = Api(app=application,
@@ -20,34 +24,45 @@ model = app.model('Recording Writer Actions for Rhetorical Adjustment',
                   {'Reward': fields.String(required=True,
                                          description="--",
                                          help="--")})
+# application.config["MONGO_URI"] = 'mongodb://' + os.environ['MONGODB_USERNAME'] + ':' + os.environ['MONGODB_PASSWORD'] + '@' + os.environ['MONGODB_HOSTNAME'] + ':27017/' + os.environ['MONGODB_DATABASE']
+# mongo = PyMongo(application)
+# db = mongo.db
 
-import pymongo
-# for using Azure CosmoDB
-def get_collection():
-    # Get connection info from environment variables
-    print("STARTING AGAIN")
-    CONNECTION_STRING = os.getenv('CONNECTION_STRING')
-    DB_NAME = os.getenv('DB_NAME')
-    COLLECTION_NAME = os.getenv('COLLECTION_NAME')
+os.environ["OPENAI_KEY"] = "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"
+warnings.filterwarnings("ignore")
+MEMORY = 1
+suggestion = "abc"
+same_line_before = ""
+same_line_after = ""
 
-    print("CONNECTION STRING: ", CONNECTION_STRING)
-    print("DB NAME: ", DB_NAME)
-    print("COLLECTION NAME: ", COLLECTION_NAME)
 
-    # Create a MongoClient
-    client = pymongo.MongoClient(CONNECTION_STRING)
-    try:
-        client.server_info()  # validate connection string
-    except pymongo.errors.ServerSelectionTimeoutError:
-        raise TimeoutError("Invalid API for MongoDB connection string or timed out when attempting to connect")
+@dataclass
+class State:
+    memory: List[Tuple[str, str]]
+    human_input: str = ""
 
-    db = client[DB_NAME]
-    return db[COLLECTION_NAME]
+    def push(self, response: str) -> "State":
+        memory = self.memory if len(self.memory) < MEMORY else self.memory[1:]
+        return State(memory + [(self.human_input, response)])
 
-# create database instance
-db = get_collection()
+class ChatPrompt(minichain.TemplatePrompt):
+    template_file = "chatgpt.pmpt.tpl"
+    def parse(self, out: str, inp: State) -> State:
+        result = out.split("Assistant:")[-1]
+        return inp.push(result)
 
-check = 0
+def run_chatgpt(before, after, current, level):
+    with minichain.start_chain("chatgpt") as backend:
+        prompt = ChatPrompt(backend.OpenAI())
+        state = State([])
+        t = "This is what comes before: \"" + before + "\". Here is what comes after: \"" + after + "\". Please optimize this sentence: \"" + current + "\". The length of sentence should not be too long or too short than previous one."
+        #text_revise = "This is what comes before: \"" + before + "\". Here is what comes after: \"" + after + "\". Please optimize this paragraph: \"" + current + "\". The length of paragraph should not be too long or too short than previous one."
+        # if level:
+        #     t = text_revise
+        state.human_input = t
+        state = prompt(state)
+        return state.memory[-1][1]
+
 @name_space.route("/activity")
 class MainClass(Resource):
 
@@ -58,9 +73,21 @@ class MainClass(Resource):
     def get(self):
         try:
             summary = "retrieving the writing actions real time from user input into the overleaf editor"
-            return {
-                "status": "Writer action's retrieved",
-            }
+            # resp_json = request.get_data()
+            # print(resp_json)
+            global suggestion
+            while (True):
+                if (suggestion == "abc"):
+                    time.sleep(0.1)
+                else:
+                    send = suggestion
+                    suggestion = "abc"
+                    return {
+                        "status": send,
+                        "same_line_before": same_line_before,
+                        "same_line_after": same_line_after
+                    }
+
         except KeyError as e:
             name_space.abort(500, e.__doc__, status="Could not retrieve information", statusCode="500")
         except Exception as e:
@@ -91,10 +118,17 @@ class MainClass(Resource):
                     check = 1
                 k += 1
             else:
-                idx = text[k][1].find(" ")
+                idx = -1
+                idx1 = text[k][1].find(" ")
                 idx2 = text[k][1].find("\n")
-                if idx > idx2 and (idx2 != -1):
+                if idx2 >= 0 > idx1:
                     idx = idx2
+                elif idx1 >= 0 > idx2:
+                    idx = idx1
+                elif idx1 > idx2 >= 0:
+                    idx = idx2
+                elif idx2 > idx1 >= 0:
+                    idx = idx1
                 if text[k][0] != 0:
                     text[k].append(1)
                 if idx == 0:
@@ -162,70 +196,21 @@ class MainClass(Resource):
         pos = 0
         for j in range(len(text)):
             try:
-                if text[i] != revision[i]:
-                    i = j
+                if text[j] != revision[j]:
+                    i = j - 1
                     break
+                if j == (len(text) - 1):
+                    i = len(text) - 1
             except IndexError:
                 i = j
                 break
-        for k in range(i - 1, -1, -1):
+        if text[i] == '\n' or text[i - 1] == '\n':
+            return pos
+        for k in range(i, -1, -1):
             if text[k] == '\n':
                 break
             pos += 1
         return pos
-
-    def pasteHandler(self, info, pre, cur, order):
-        charNum = self.pasteCountChar(info["text"], info["revision"])
-        lineNum = info['line']
-        i = 0
-        list1 = []
-        list2 = []
-        list3 = []
-        while i < len(cur):
-            if i >= len(pre):
-                list2.extend(cur[i:])
-                break
-            else:
-                if pre[i] != cur[i]:
-                    if pre[i] in cur[i:]:
-                        list3.append(cur[i])
-                        cur.pop(i)
-                    else:
-                        list1.append(pre[i])
-                        list2.append(cur[i])
-                        i += 1
-                else:
-                    if list3 != []:
-                        if pre[i] == list3[0][0]:
-                            list3.pop(0)
-                    i += 1
-        list2.extend(list3)
-        start = ''
-        end = ''
-        if order == 1:
-            if list1:
-                for each in list1:
-                    start = start + each + ' '
-                for each in list2:
-                    end = end + each + ' '
-                info['changes'] = '(' + str(lineNum) + ',' + str(charNum) + ')' + ", " + start + "->" + end
-            else:
-                for each in list2:
-                    end = end + each + ' '
-                info['changes'] = '(' + str(lineNum) + ',' + str(charNum) + ')' + ", " + end + "---added"
-        else:
-            if list2:
-                for each in list2:
-                    start = start + each + ' '
-                for each in list1:
-                    end = end + each + ' '
-                info['changes'] = '(' + str(lineNum) + ',' + str(charNum) + ')' + ", " + start + "->" + end
-            else:
-                for each in list1:
-                    end = end + each + ' '
-                info['changes'] = '(' + str(lineNum) + ',' + str(charNum) + ')' + ", " + end + "---added"
-        info["text"] = info.pop("revision")
-        return info
 
     def typeHandler(self, info):
         text = info['revision']
@@ -358,29 +343,46 @@ class MainClass(Resource):
         info['cb'] = '(' + str(linenumbers[linePos]) + ',' + str(charPos) + ')' + ", " + info['cb']
         return info
 
+    def atbound(self,text, j):
+        if j + 1 == len(text):
+            return True
+        elif text[j + 1][0] == '\n':
+            return True
+        return False
+
     def post(self):
         try:
             info = request.get_json(force=True)
             state = info['state']
-            if state == 3:
-                pre = []
-                for s in info["text"].splitlines():
-                    pre.extend(sent_tokenize(s))
-                cur = []
-                for s in info["revision"].splitlines():
-                    cur.extend(sent_tokenize(s))
-                # pre = sent_tokenize(info["text"])
-                # cur = sent_tokenize(info["revision"])
-                if len(pre) > len(cur):
-                    info = self.pasteHandler(info, cur, pre, 2)
+            if state == "user_selection":
+                print("more detail in the future")
+            elif state == "assist":
+                dmp.Match_Distance = 5000
+                start = dmp.match_main(info["current_content"], info["selected_text"], 0)
+                length = len([each for each in sent_tokenizer(info["selected_text"]).sents])
+                if length == 1:
+                    level = 0
                 else:
-                    info = self.pasteHandler(info, pre, cur, 1)
+                    level = 1
+                global suggestion, same_line_before, same_line_after
+
+                same_line_before = info["current_content"][:start]
+                same_line_after = info["current_content"][start+len(info["selected_text"]):]
+                suggestion = run_chatgpt(info["pre_content"]+info["current_content"][:start],
+                  info["current_content"][start+len(info["selected_text"]):]+info["pos_content"],
+                  info["selected_text"],
+                  level)
+                info["context above"] = info["pre_content"]+info["current_content"][:start]
+                info["context below"] = info["current_content"][start+len(info["selected_text"]):]+info["pos_content"]
+                info["suggestion"] = suggestion
+                info.pop("pre_content")
+                info.pop("pos_content")
+                info.pop("current_content")
             elif state == 2:
                 info = self.copyHandler(info)
-            else:
+            elif state != 3:
                 changes = self.typeHandler(info)
                 info["changes"] = changes
-
             if state == 0 or state == 4:
                 info.pop('line')
                 info.pop("cb")
@@ -390,14 +392,8 @@ class MainClass(Resource):
             elif state == 2:
                 info.pop('copyLineNumbers')
                 info["copy"] = info.pop("cb")
-            elif state == 3:
-                info.pop('line')
-                info["paste"] = info.pop("cb")
-            #info["ip_address"] = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-            #info["project_id"] = request.path
 
-            # add document to database
-            # db.activity.insert_one(info)
+            #db.activity.insert_one(info)
             print(info)
 
             return {
@@ -412,6 +408,3 @@ if __name__ == "__main__":
     ENVIRONMENT_DEBUG = os.environ.get("APP_DEBUG", True)
     ENVIRONMENT_PORT = os.environ.get("APP_PORT", 5000)
     application.run(host='0.0.0.0', port=ENVIRONMENT_PORT, debug=ENVIRONMENT_DEBUG)
-
-    # to run directly from Azure uncomment this line and comment out the above
-    # app.run()

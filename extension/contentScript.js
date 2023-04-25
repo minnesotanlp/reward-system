@@ -13,7 +13,6 @@ let state = 0;
 let pasteData = "";
 let clipboardData = "";
 let project_id = ""
-const reg = /(\\\S+$)/g;
 const reg1 = /(\\author(?:\[(\d*)\])*{+[^}\n\\]+}*)/g;
 const reg2 = /(\\affil(?:\[(\d*)\])*{+[^}\n\\]+}*)/g;
 let file;
@@ -99,26 +98,48 @@ document.body.addEventListener('paste', (event) => {
 function getEditingText() { // find areas in current file that reader may be reading
     let textarea = document.getElementsByClassName("ace_line_group");
     let linearea = document.getElementsByClassName("ace_gutter-cell");
-    if (version == "new") {
-        textarea = document.getElementsByClassName("cm-line");
-        linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
-    }
     edittingArray = [];
     edittingLines = [];
 
-    editingParagraph = textarea[0].textContent;
-    edittingArray.push(textarea[0].textContent);
-    edittingLines.push(linearea[0].textContent);
-    for (var i = 1; i < textarea.length; i++) { // rebuilding the editor view everytime is inefficient..?
-        let line = '\n' + textarea[i].textContent;
-        line.replace(reg, '');
-        editingParagraph += line;
-        edittingArray.push(line);
-        edittingLines.push(linearea[i].textContent);
+    if (version == "new") {
+        editingParagraph = "";
+        edittingArray = [];
+        edittingLines = [];
+        textarea = document.getElementsByClassName("cm-content cm-lineWrapping");;
+        linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
+        console.log(linearea);
+        lines = textarea[0].childNodes;
+        var length = lines.length;
+        for (var k = 0; k < length; k++) {
+            line = lines[k].innerText;
+            if(line === "\n"){
+               line = "";
+            }
+            if(k > 0){
+                line = "\n"+line;
+            }
+            editingParagraph += line;
+            edittingArray.push(line);
+            edittingLines.push(linearea[k+1].textContent);
+        }
     }
+
+    else{
+        editingParagraph = textarea[0].textContent;
+        edittingArray.push(textarea[0].textContent);
+        edittingLines.push(linearea[0].textContent);
+        for (var i = 1; i < textarea.length; i++) { // rebuilding the editor view everytime is inefficient..?
+            let line = '\n' + textarea[i].textContent;
+            editingParagraph += line;
+            edittingArray.push(line);
+            edittingLines.push(linearea[i].textContent);
+        }
+    }
+
     editingParagraph = editingParagraph.replace(reg1, '\\author{anonymous}');
     editingParagraph = editingParagraph.replace(reg2, '\\affil{anonymous}');
     destroy();
+    console.log(editingParagraph);
     console.log(edittingArray);
     console.log(edittingLines);
 
@@ -149,15 +170,19 @@ const scrollPost = (mutations) =>{
         destroy();
     }
 }
-let targetNode = document.querySelector('.ace_content');
-console.log(targetNode);
-if (version == "new") {
-    console.log(version);
-    targetNode = document.querySelector('div.cm-content');
-}
-console.log(targetNode);
-const config = {attributeFilter: ["style"],attributeOldValue: true};
 
+// scroll mutation observer setup
+let targetNode = undefined;
+let config = undefined
+if (version == "new") {
+    targetNode = document.querySelector('.cm-scroller');
+}
+else{
+    targetNode = document.querySelector('.ace_content');
+}
+
+config = {attributeFilter: ["style"],attributeOldValue: true};
+console.log(targetNode);
 const scrollObserver = new MutationObserver(scrollPost);
 scrollObserver.observe(targetNode, config);
 
@@ -192,24 +217,41 @@ window.addEventListener("load", function(){
     let textarea = document.getElementsByClassName("ace_line_group");
     let linearea = document.getElementsByClassName("ace_gutter-cell");
     if (version == "new") {
-        textarea = document.getElementsByClassName("cm-line");
+        Paragraph = "";
+        paragraphArray = [];
+        paragraphLines = [];
+        textarea = document.getElementsByClassName("cm-content cm-lineWrapping");;
         linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
         console.log(linearea);
-        //console.log(linearea[0]);
-        //console.log(linearea[0].childNodes);
+        lines = textarea[0].childNodes;
+        var length = lines.length;
+        for (var k = 0; k < length; k++) {
+            line = lines[k].innerText;
+            if(line === "\n"){
+               line = "";
+            }
+            if(k > 0){
+                line = "\n"+line;
+            }
+            paragraph += line;
+            paragraphArray.push(line);
+        }
     }
-    paragraph = textarea[0].textContent;
-    paragraphArray.push(textarea[0].textContent);
-    paragraphLines.push(linearea[0].textContent);
-    for (var i = 1; i < textarea.length; i++) { // rebuilding the editor view everytime is inefficient..?
-        let line = '\n' + textarea[i].textContent;
-        line.replace(reg, '');
-        paragraph += line;
-        paragraphArray.push(line);
-        paragraphLines.push(linearea[i].textContent);
+
+    else{
+        paragraph = textarea[0].textContent;
+        paragraphArray.push(textarea[0].textContent);
+        paragraphLines.push(linearea[0].textContent);
+        for (var i = 1; i < textarea.length; i++) { // rebuilding the editor view everytime is inefficient..?
+            let line = '\n' + textarea[i].textContent;
+            paragraph += line;
+            paragraphArray.push(line);
+            paragraphLines.push(linearea[i].textContent);
+        }
     }
     paragraph = paragraph.replace(reg1, '\\author{anonymous}');
     paragraph = paragraph.replace(reg2, '\\affil{anonymous}');
+
     // valid for both legacy and non-legacy
     project_id = document.querySelector('meta[name="ol-project_id"]').content
     file = document.querySelector('[aria-selected = "true"]');
@@ -239,12 +281,17 @@ function tooltipClick(event) {
     tooltip.parentNode.removeChild(tooltip);
     tooltip = null;
     document.removeEventListener('click', tooltipClick);
+    chrome.runtime.sendMessage({message: "user_selection", accept: false});
   }
   else if (tooltip && tooltip.contains(event.target)){
     console.log("1: ",same_line_before);
     console.log("2: ",tpcontent);
     console.log("3: ",same_line_after);
     lines[idx].innerText = same_line_before+tpcontent+same_line_after;
+    tooltip.parentNode.removeChild(tooltip);
+    tooltip = null;
+    document.removeEventListener('click', tooltipClick);
+    chrome.runtime.sendMessage({message: "user_selection", accept: true});
   }
 }
 
@@ -316,11 +363,9 @@ document.body.onkeyup = function (e) { // save every keystroke
                 line = "\n\n";
             }
             if (k < i){
-                line.replace(reg, '');
                 pre_content += line;
             }
             else if (k > i){
-                line.replace(reg, '');
                 pos_content += line;
             }
         }
@@ -333,7 +378,6 @@ document.body.onkeyup = function (e) { // save every keystroke
         console.log(lines[i].innerText);
         console.log(pos_content);
 
-        // get the position of tooltip
         tptop = selected_pos.y + selected_pos.height;
         tpleft = selected_pos.x + selected_pos.width;
         idx = i;

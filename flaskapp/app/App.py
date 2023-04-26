@@ -28,7 +28,7 @@ model = app.model('Recording Writer Actions for Rhetorical Adjustment',
 # mongo = PyMongo(application)
 # db = mongo.db
 
-os.environ["OPENAI_KEY"] = "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"
+os.environ["OPENAI_KEY"] = ""
 warnings.filterwarnings("ignore")
 MEMORY = 1
 suggestion = "abc"

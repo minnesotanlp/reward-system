@@ -1,11 +1,5 @@
-let version = "legacy";
-let editor = document.getElementsByClassName("ace_editor")[0];
-if (editor === null || editor === undefined) {
-    editor = document.getElementsByClassName("editor")[0];
-    version = "new";
-}
+editor = document.getElementsByClassName("editor")[0];
 console.log(editor);
-console.log(version);
 
 let paragraph = "";
 let editingParagraph = "";
@@ -32,7 +26,7 @@ let idx = null;
 let same_line_before = ""
 let same_line_after = ""
 
-let EXTENSION_TOGGLE = false
+let EXTENSION_TOGGLE = true
 let tpcontent = "Hello, This is a tooltip!"
 
 chrome.runtime.onMessage.addListener(
@@ -96,44 +90,26 @@ document.body.addEventListener('paste', (event) => {
 });
 
 function getEditingText() { // find areas in current file that reader may be reading
-    let textarea = document.getElementsByClassName("ace_line_group");
-    let linearea = document.getElementsByClassName("ace_gutter-cell");
+    editingParagraph = "";
     edittingArray = [];
     edittingLines = [];
+    let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
+    let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
+    console.log(linearea);
 
-    if (version == "new") {
-        editingParagraph = "";
-        edittingArray = [];
-        edittingLines = [];
-        textarea = document.getElementsByClassName("cm-content cm-lineWrapping");;
-        linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
-        console.log(linearea);
-        lines = textarea[0].childNodes;
-        var length = lines.length;
-        for (var k = 0; k < length; k++) {
-            line = lines[k].innerText;
-            if(line === "\n"){
-               line = "";
-            }
-            if(k > 0){
-                line = "\n"+line;
-            }
-            editingParagraph += line;
-            edittingArray.push(line);
-            edittingLines.push(linearea[k+1].textContent);
+    lines = textarea[0].childNodes;
+    var length = lines.length;
+    for (var k = 1; k < length; k++) {
+        line = lines[k].innerText;
+        if(line === "\n"){
+           line = "";
         }
-    }
-
-    else{
-        editingParagraph = textarea[0].textContent;
-        edittingArray.push(textarea[0].textContent);
-        edittingLines.push(linearea[0].textContent);
-        for (var i = 1; i < textarea.length; i++) { // rebuilding the editor view everytime is inefficient..?
-            let line = '\n' + textarea[i].textContent;
-            editingParagraph += line;
-            edittingArray.push(line);
-            edittingLines.push(linearea[i].textContent);
+        if(k > 1){
+            line = "\n"+line;
         }
+        editingParagraph += line;
+        edittingArray.push(line);
+        edittingLines.push(linearea[k].textContent);
     }
 
     editingParagraph = editingParagraph.replace(reg1, '\\author{anonymous}');
@@ -174,12 +150,7 @@ const scrollPost = (mutations) =>{
 // scroll mutation observer setup
 let targetNode = undefined;
 let config = undefined
-if (version == "new") {
-    targetNode = document.querySelector('.cm-scroller');
-}
-else{
-    targetNode = document.querySelector('.ace_content');
-}
+targetNode = document.querySelector('.cm-scroller');
 
 config = {attributeFilter: ["style"],attributeOldValue: true};
 console.log(targetNode);
@@ -191,13 +162,19 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const filePost = () =>{
+async function filePost(){
     editingObserver.disconnect();
     file = document.querySelector('[aria-selected = "true"]');
     console.log(file);
     f = file.getAttribute("aria-label");
     console.log(f);
-    sleep(500).then(() => {
+
+    let loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
+    while (loadNode == undefined) {
+        console.log("here")
+        await sleep(100); // Adjust the delay time as needed
+        loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
+    }
     getEditingText();
     console.log(editingParagraph);
     if (EXTENSION_TOGGLE) {
@@ -208,50 +185,43 @@ const filePost = () =>{
     paragraphArray = edittingArray;
     paragraphLines = edittingLines;
     destroy();
-    editingObserver.observe(file, {attributeFilter: ["aria-selected", "selected"]});});
+    editingObserver.observe(file, {attributeFilter: ["aria-selected", "selected"]});
 }
+
 const editingObserver = new MutationObserver(filePost);
 
-window.addEventListener("load", function(){
-    sleep(500).then(() => {
-    let textarea = document.getElementsByClassName("ace_line_group");
-    let linearea = document.getElementsByClassName("ace_gutter-cell");
-    if (version == "new") {
-        Paragraph = "";
-        paragraphArray = [];
-        paragraphLines = [];
-        textarea = document.getElementsByClassName("cm-content cm-lineWrapping");;
-        linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
-        console.log(linearea);
-        lines = textarea[0].childNodes;
-        var length = lines.length;
-        for (var k = 0; k < length; k++) {
-            line = lines[k].innerText;
-            if(line === "\n"){
-               line = "";
-            }
-            if(k > 0){
-                line = "\n"+line;
-            }
-            paragraph += line;
-            paragraphArray.push(line);
-        }
+window.addEventListener("load", async function(){
+    paragraph = "";
+    paragraphArray = [];
+    paragraphLines = [];
+    let listenNode = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0];
+    while (!document.contains(listenNode) || listenNode == undefined) {
+        console.log("attempt read")
+        await sleep(100); // Adjust the delay time as needed
+        listenNode = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0];
     }
+    let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
+    let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
 
-    else{
-        paragraph = textarea[0].textContent;
-        paragraphArray.push(textarea[0].textContent);
-        paragraphLines.push(linearea[0].textContent);
-        for (var i = 1; i < textarea.length; i++) { // rebuilding the editor view everytime is inefficient..?
-            let line = '\n' + textarea[i].textContent;
-            paragraph += line;
-            paragraphArray.push(line);
-            paragraphLines.push(linearea[i].textContent);
+    lines = textarea[0].childNodes;
+    var length = lines.length;
+    for (var k = 1; k < length; k++) {
+        line = lines[k].innerText;
+        if(line === "\n"){
+           line = "";
         }
+        if(k > 1){
+            line = "\n"+line;
+        }
+        paragraph += line;
+        paragraphArray.push(line);
+        paragraphLines.push(linearea[k].textContent);
     }
     paragraph = paragraph.replace(reg1, '\\author{anonymous}');
     paragraph = paragraph.replace(reg2, '\\affil{anonymous}');
 
+    console.log(paragraph)
+    console.log(paragraphLines)
     // valid for both legacy and non-legacy
     project_id = document.querySelector('meta[name="ol-project_id"]').content
     file = document.querySelector('[aria-selected = "true"]');
@@ -271,7 +241,7 @@ window.addEventListener("load", function(){
     })
     const fileObserver = new MutationObserver(filePost);
     const fileConfig = {attributeFilter: ["aria-selected", "selected"]};
-    fileObserver.observe(file, fileConfig);});
+    fileObserver.observe(file, fileConfig);
 });
 
 

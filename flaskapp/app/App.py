@@ -274,7 +274,7 @@ class MainClass(Resource):
             elif (text[i][0] == 1) and (0 < i < length - 1):
                 pos = self.countChar(1, i, text)
                 if i == length - 2 and (
-                        text[length - 1][1].isspace() or text[length - 1][1] == "\n") and swapword == []:
+                        text[length - 1][1][0].isspace() or text[length - 1][1][0] == "\n") and swapword == []:
                     changes.append('(' + str(lineNum) + ',' + str(pos) + ')' + ", " + text[i][1] + "---added")
                 else:
                     check1, back = self.findback(i, 1, -1, text)

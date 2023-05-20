@@ -1,7 +1,7 @@
 let serverURL;
-// serverURL = "http://127.0.0.1:5000/"
+serverURL = "http://127.0.0.1:5000/"
 // serverURL = "http://localhost"
-serverURL = "your_url_here";
+// serverURL = "your_url_here";
 let headers = new Headers();
 headers.append('GET', 'POST', 'OPTIONS');
 headers.append('Access-Control-Allow-Origin', 'http://127.0.0.1:5000/');

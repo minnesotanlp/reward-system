@@ -1,4 +1,5 @@
 import time
+import copy
 from flask import Flask, request, jsonify
 from flask_restx import Api, Resource, fields
 import warnings
@@ -106,6 +107,33 @@ class MainClass(Resource):
                 return False
         except IndexError:
             return True
+
+    def atbound(self, text, j):
+        if j + 1 == len(text):
+            return True
+        elif text[j + 1][0] == '\n':
+            return True
+        return False
+
+    def sentence_reform(self, splited):
+        j = 0
+        while j < len(splited):
+            if j + 1 < len(splited) and (splited[j][-1:] == '\n') and splited[j + 1][0] != '\n':
+                splited[j + 1] = splited[j][-1:] + splited[j + 1][:]
+                splited[j] = splited[j][:-1]
+                j += 1
+            elif (splited[j][-1:] == '\n') and self.atbound(splited, j):
+                splited.insert(j + 1, splited[j][-1:])
+                splited[j] = splited[j][:-1]
+                j += 2
+            else:
+                j += 1
+        k = 0
+        while k < len(splited):
+            if splited[k] == '':
+                splited.pop(k)
+            k += 1
+        return splited
 
     def findback(self, i, type, skip, text):
         back = ""
@@ -343,16 +371,60 @@ class MainClass(Resource):
         info['cb'] = '(' + str(linenumbers[linePos]) + ',' + str(charPos) + ')' + ", " + info['cb']
         return info
 
-    def atbound(self,text, j):
-        if j + 1 == len(text):
-            return True
-        elif text[j + 1][0] == '\n':
-            return True
-        return False
+    def pasteHandler(self, short, long, order):
+        change = ""
+        i = 0
+        j = 0
+        long_diff_start = -1
+        long_diff_end = 0
+        short_diff_start = -1
+        short_diff_end = 0
+        const_long = copy.deepcopy(long)
+        if short == [] and order == 2:
+            change = "".join(const_long[:]) + "--deleted"
+            return change
+        elif short == [] and order == 1:
+            change = "".join(const_long[:]) + "--deleted"
+            return change
+        elif len(short) == len(long):
+            for k in range(len(short)):
+                if short[k] != long[k] and long_diff_start == -1:
+                    long_diff_start = k
+                elif short[k] != long[k]:
+                    long_diff_end = k
+            if long_diff_end >= long_diff_start:
+                change = "".join(short[long_diff_start:long_diff_end + 1])+ "->"+ "".join(long[long_diff_start: long_diff_end + 1])
+            else:
+                change = "".join(short[long_diff_start])+ "->"+ "".join(long[long_diff_start])
+            return change
+        while i < len(short):
+            if short[i] != long[i] and long_diff_start == -1:
+                long.pop(i)
+                long_diff_start = i
+                short_diff_start = i
+            elif short[i] != long[i]:
+                long.pop(i)
+                short_diff_end = i
+                long_diff_end = j
+            elif short[i] == long[i]:
+                i += 1
+            j += 1
+        if long_diff_start == -1:
+            change = "no change"
+        elif short_diff_start == short_diff_end and order == 1:
+            change = "".join(const_long[long_diff_start: long_diff_end + 1]) + "--added"
+        elif short_diff_start == short_diff_end and order == 2:
+            change = "".join(const_long[long_diff_start: long_diff_end + 1]) + "--deleted"
+        elif order == 1:
+            change = "".join(short[short_diff_start: short_diff_end + 1]) + "->" + "".join(const_long[long_diff_start: long_diff_end + 1])
+        elif order == 2:
+            change = "".join(const_long[long_diff_start: long_diff_end + 1]) + "->" + "".join(short[short_diff_start: short_diff_end + 1])
+        return change
 
     def post(self):
         try:
             info = request.get_json(force=True)
+            print(info)
             state = info['state']
             if state == "user_selection":
                 print("more detail in the future")
@@ -380,7 +452,26 @@ class MainClass(Resource):
                 info.pop("current_content")
             elif state == 2:
                 info = self.copyHandler(info)
-            elif state != 3:
+            elif state == 3:
+                pre_text = self.sentence_reform(info["text"].splitlines(keepends=True))
+                cur_text = self.sentence_reform(info["revision"].splitlines(keepends=True))
+                pre = []
+                cur = []
+                for s in pre_text:
+                    for each in sent_tokenizer(s).sents:
+                        pre.extend([str(each)])
+                for s in cur_text:
+                    for each in sent_tokenizer(s).sents:
+                        cur.extend([str(each)])
+                if len(pre) > len(cur):
+                    change = self.pasteHandler(cur, pre, 2)
+                else:
+                    change = self.pasteHandler(pre, cur, 1)
+                if change != "no change":
+                    charNum = self.pasteCountChar(info["text"], info["revision"])
+                    lineNum = info['line']
+                    info["changes"] = '(' + str(lineNum) + ',' + str(charNum) + ')' + change
+            else:
                 changes = self.typeHandler(info)
                 info["changes"] = changes
             if state == 0 or state == 4:

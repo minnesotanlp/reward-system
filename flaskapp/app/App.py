@@ -371,56 +371,84 @@ class MainClass(Resource):
         info['cb'] = '(' + str(linenumbers[linePos]) + ',' + str(charPos) + ')' + ", " + info['cb']
         return info
 
-    def pasteHandler(self, short, long, order):
+    def pasteHandlerv3(self, pre, cur, order):
+        # if order is 1, mean cur is longer than pre
+        # if order is 2, means pre is longer than cur
         change = ""
         i = 0
         j = 0
-        long_diff_start = -1
-        long_diff_end = 0
-        short_diff_start = -1
-        short_diff_end = 0
-        const_long = copy.deepcopy(long)
-        if short == [] and order == 2:
-            change = "".join(const_long[:]) + "--deleted"
-            return change
-        elif short == [] and order == 1:
-            change = "".join(const_long[:]) + "--deleted"
-            return change
-        elif len(short) == len(long):
-            for k in range(len(short)):
-                if short[k] != long[k] and long_diff_start == -1:
-                    long_diff_start = k
-                elif short[k] != long[k]:
-                    long_diff_end = k
-            if long_diff_end >= long_diff_start:
-                change = "".join(short[long_diff_start:long_diff_end + 1])+ "->"+ "".join(long[long_diff_start: long_diff_end + 1])
-            else:
-                change = "".join(short[long_diff_start])+ "->"+ "".join(long[long_diff_start])
-            return change
-        while i < len(short):
-            if short[i] != long[i] and long_diff_start == -1:
-                long.pop(i)
-                long_diff_start = i
-                short_diff_start = i
-            elif short[i] != long[i]:
-                long.pop(i)
-                short_diff_end = i
-                long_diff_end = j
-            elif short[i] == long[i]:
-                i += 1
-            j += 1
-        if long_diff_start == -1:
-            change = "no change"
-        elif short_diff_start == short_diff_end and order == 1:
-            change = "".join(const_long[long_diff_start: long_diff_end + 1]) + "--added"
-        elif short_diff_start == short_diff_end and order == 2:
-            change = "".join(const_long[long_diff_start: long_diff_end + 1]) + "--deleted"
-        elif order == 1:
-            change = "".join(short[short_diff_start: short_diff_end + 1]) + "->" + "".join(const_long[long_diff_start: long_diff_end + 1])
-        elif order == 2:
-            change = "".join(const_long[long_diff_start: long_diff_end + 1]) + "->" + "".join(short[short_diff_start: short_diff_end + 1])
-        return change
+        diff_section1 = []
+        diff_section2 = []
 
+        # use to handle some edge cases
+        if cur == []:
+            print("".join(pre[:]), "--deleted")
+            return
+        elif pre == []:
+            print("".join(cur[:]), "--added")
+            return
+
+        # use to handle most common cases
+        # const_long is use to keep original text
+        switch = 0
+        if order == 1:
+            long = cur
+            short = pre
+            length = len(pre)
+            while i < length:
+                if short[i] != long[i]:
+                    if switch:
+                        diff_section1.append(long.pop(i))
+                    else:
+                        diff_section2.append(long.pop(i))
+                elif short[i] == long[i]:
+                    i += 1
+                j += 1
+                if len(pre) > len(cur):
+                    switch = 1
+                    length = len(cur)
+                    long = pre
+                    short = cur
+        else:
+            long = pre
+            short = cur
+            length = len(cur)
+            while i < length:
+                if short[i] != long[i]:
+                    if switch:
+                        diff_section2.append(long.pop(i))
+                    else:
+                        diff_section1.append(long.pop(i))
+                elif short[i] == long[i]:
+                    i += 1
+                j += 1
+                if len(pre) < len(cur):
+                    switch = 1
+                    length = len(pre)
+                    long = cur
+                    short = pre
+
+        # remove the first '\n' if it's at the beginning of each list element
+        for i in range(len(diff_section1)):
+            if diff_section1[i][0] == '\n':
+                diff_section1[i] = diff_section1[i][1:]
+        for i in range(len(diff_section2)):
+            if diff_section2[i][0] == '\n':
+                diff_section2[i] = diff_section2[i][1:]
+
+        diff_sentence1 = "".join(diff_section1)
+        diff_sentence2 = "".join(diff_section2)
+
+        if diff_sentence1 == "" and diff_sentence2 == "":
+            change = "no change"
+        elif diff_sentence1 == "" and diff_sentence2 != "":
+            change = diff_sentence2 + "--added"
+        elif diff_sentence1 != "" and diff_sentence2 == "":
+            change = diff_sentence1 + "--deleted"
+        elif diff_sentence1 != "" and diff_sentence2 != "":
+            change = diff_sentence1 + "->" + diff_sentence2
+
+        return change
     def post(self):
         try:
             info = request.get_json(force=True)
@@ -463,10 +491,10 @@ class MainClass(Resource):
                 for s in cur_text:
                     for each in sent_tokenizer(s).sents:
                         cur.extend([str(each)])
-                if len(pre) > len(cur):
-                    change = self.pasteHandler(cur, pre, 2)
-                else:
+                if len(pre) < len(cur):
                     change = self.pasteHandler(pre, cur, 1)
+                else:
+                    change = self.pasteHandler(pre, cur, 2)
                 if change != "no change":
                     charNum = self.pasteCountChar(info["text"], info["revision"])
                     lineNum = info['line']

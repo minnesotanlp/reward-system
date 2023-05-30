@@ -371,7 +371,7 @@ class MainClass(Resource):
         info['cb'] = '(' + str(linenumbers[linePos]) + ',' + str(charPos) + ')' + ", " + info['cb']
         return info
 
-    def pasteHandlerv3(self, pre, cur, order):
+    def pasteHandler(self, pre, cur, order):
         # if order is 1, mean cur is longer than pre
         # if order is 2, means pre is longer than cur
         change = ""
@@ -449,6 +449,7 @@ class MainClass(Resource):
             change = diff_sentence1 + "->" + diff_sentence2
 
         return change
+
     def post(self):
         try:
             info = request.get_json(force=True)

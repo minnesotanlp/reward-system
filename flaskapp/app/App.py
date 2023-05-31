@@ -388,19 +388,32 @@ class MainClass(Resource):
             print("".join(cur[:]), "--added")
             return
 
+        # const_pre and const_cur is use to reconstrct the original text
+        original_pre = copy.deepcopy(pre)
+        original_cur = copy.deepcopy(cur)
+        for k in range(len(pre)):
+            if pre[k][0] == '\n':
+                pre[k] = pre[k][1:]
+        for k in range(len(cur)):
+            if cur[k][0] == '\n':
+                cur[k] = cur[k][1:]
+
         # use to handle most common cases
-        # const_long is use to keep original text
         switch = 0
         if order == 1:
             long = cur
             short = pre
+            original_long = original_cur
+            original_short = original_pre
             length = len(pre)
             while i < length:
                 if short[i] != long[i]:
                     if switch:
-                        diff_section1.append(long.pop(i))
+                        diff_section1.append(original_long.pop(i))
+                        long.pop(i)
                     else:
-                        diff_section2.append(long.pop(i))
+                        diff_section2.append(original_long.pop(i))
+                        long.pop(i)
                 elif short[i] == long[i]:
                     i += 1
                 j += 1
@@ -409,16 +422,26 @@ class MainClass(Resource):
                     length = len(cur)
                     long = pre
                     short = cur
+                    original_long = original_pre
+                    original_short = original_cur
+
+            if i < len(long):
+                diff_section1.extend(original_short[i - 1:])
+                diff_section2.extend(original_long)
         else:
             long = pre
             short = cur
+            original_long = original_pre
+            original_short = original_cur
             length = len(cur)
             while i < length:
                 if short[i] != long[i]:
                     if switch:
-                        diff_section2.append(long.pop(i))
+                        diff_section2.append(original_long.pop(i))
+                        long.pop(i)
                     else:
-                        diff_section1.append(long.pop(i))
+                        diff_section1.append(original_long.pop(i))
+                        long.pop(i)
                 elif short[i] == long[i]:
                     i += 1
                 j += 1
@@ -427,17 +450,25 @@ class MainClass(Resource):
                     length = len(pre)
                     long = cur
                     short = pre
+                    original_long = original_cur
+                    original_short = original_pre
+            if i < len(long):
+                diff_section1.extend(original_long)
+                diff_section2.extend(original_short[i - 1:])
 
-        # remove the first '\n' if it's at the beginning of each list element
-        for i in range(len(diff_section1)):
-            if diff_section1[i][0] == '\n':
-                diff_section1[i] = diff_section1[i][1:]
-        for i in range(len(diff_section2)):
-            if diff_section2[i][0] == '\n':
-                diff_section2[i] = diff_section2[i][1:]
+        diff_sentence1 = "".join(diff_section1[:1])
+        for l in range(1, len(diff_section1[1:]) + 1):
+            if diff_section1[l][0] != '\n':
+                diff_sentence1 += " " + diff_section1[l]
+            else:
+                diff_sentence1 += diff_section1[l]
 
-        diff_sentence1 = "".join(diff_section1)
-        diff_sentence2 = "".join(diff_section2)
+        diff_sentence2 = "".join(diff_section2[:1])
+        for m in range(1, len(diff_section2[1:]) + 1):
+            if diff_section2[m][0] != '\n':
+                diff_sentence2 += " " + diff_section2[m]
+            else:
+                diff_sentence2 += diff_section2[m]
 
         if diff_sentence1 == "" and diff_sentence2 == "":
             change = "no change"
@@ -500,6 +531,8 @@ class MainClass(Resource):
                     charNum = self.pasteCountChar(info["text"], info["revision"])
                     lineNum = info['line']
                     info["changes"] = '(' + str(lineNum) + ',' + str(charNum) + ')' + change
+                else:
+                    info["changes"] = "no change"
             else:
                 changes = self.typeHandler(info)
                 info["changes"] = changes

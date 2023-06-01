@@ -35,7 +35,7 @@ MEMORY = 1
 suggestion = "abc"
 same_line_before = ""
 same_line_after = ""
-
+pre_state = -1
 
 @dataclass
 class State:
@@ -66,7 +66,6 @@ def run_chatgpt(before, after, current, level):
 
 @name_space.route("/activity")
 class MainClass(Resource):
-
     check = 0
     @app.doc(responses={200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error'},
              params={'activity': 'data from most recent writing activity',
@@ -388,7 +387,7 @@ class MainClass(Resource):
             print("".join(cur[:]), "--added")
             return
 
-        # const_pre and const_cur is use to reconstrct the original text
+        # const_pre and const_cur is use to reconstruct the original text
         original_pre = copy.deepcopy(pre)
         original_cur = copy.deepcopy(cur)
         for k in range(len(pre)):
@@ -400,7 +399,13 @@ class MainClass(Resource):
 
         # use to handle most common cases
         switch = 0
-        if order == 1:
+        if len(pre) == len(cur):
+            length = len(pre)
+            for i in range(length):
+                if pre[i] != cur[i]:
+                    diff_section1.append(original_pre[i])
+                    diff_section2.append(original_cur[i])
+        elif order == 1:
             long = cur
             short = pre
             original_long = original_cur
@@ -483,6 +488,7 @@ class MainClass(Resource):
 
     def post(self):
         try:
+            global pre_state
             info = request.get_json(force=True)
             print(info)
             state = info['state']
@@ -512,7 +518,8 @@ class MainClass(Resource):
                 info.pop("current_content")
             elif state == 2:
                 info = self.copyHandler(info)
-            elif state == 3:
+                pre_state = 2
+            elif ((info['onkey'] in "zZyY") and pre_state == 3) or state == 3:
                 pre_text = self.sentence_reform(info["text"].splitlines(keepends=True))
                 cur_text = self.sentence_reform(info["revision"].splitlines(keepends=True))
                 pre = []
@@ -533,9 +540,11 @@ class MainClass(Resource):
                     info["changes"] = '(' + str(lineNum) + ',' + str(charNum) + ')' + change
                 else:
                     info["changes"] = "no change"
+                pre_state = 3
             else:
                 changes = self.typeHandler(info)
                 info["changes"] = changes
+                pre_state = info['state']
             if state == 0 or state == 4:
                 info.pop('line')
                 info.pop("cb")

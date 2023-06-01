@@ -19,6 +19,7 @@ let lineNumber;
 let copyLineNumbers;
 let projectID = "no url"
 let suggestion = ""
+let onkey = ""
 
 chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
@@ -26,6 +27,7 @@ chrome.runtime.onMessage.addListener(
         text = text.filter(function(element) {return element !== undefined;});
         projectID = request.project_id
         filename = request.editingFile;
+        onkey = request.onkey
         if (request.message == "user_selection"){
             var d = new Date();
             var ms = d.getMilliseconds();
@@ -181,7 +183,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
     var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,)
     if (state == 3){
         postWriterText({timestamp: time, project: projectID, file: filename, text: writerText, revision: revisions,
-        state: state, cb: clipboard, line: ln})
+        state: state, cb: clipboard, line: ln, onkey: onkey})
         text = [revisions]
         clipboard = "";
     }
@@ -189,14 +191,14 @@ function trackWriterAction(state, writerText, revisions, ln) {
             change = "deletion";
             changemade = difference(text[0], revisions)
             postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-             state: state, cb: clipboard, line: ln})
+             state: state, cb: clipboard, line: ln, onkey: onkey})
             text = [revisions]
     }
     else if (diff[0][1] === '\n' || diff[0][1] === ' ') {
         change = "addition";
         changemade = difference(text[0], revisions)
         postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-         state: state, cb: clipboard, line: ln})
+         state: state, cb: clipboard, line: ln, onkey: onkey})
         text = [revisions]
     }
     else if (diff.length < 2 && (state== 0 || state == 4)) {
@@ -206,7 +208,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
         if (state == 1 || state == 2) {
             change = "cut/copy";
             postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: diff,
-            state: state, cb: clipboard, line: ln, copyLineNumbers:copyLineNumbers})
+            state: state, cb: clipboard, line: ln, copyLineNumbers:copyLineNumbers, onkey: onkey})
             text = [revisions]
             clipboard = "";
         }
@@ -217,7 +219,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
                // if user delete a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
                 postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-                state: state, cb: clipboard, line: ln})
+                state: state, cb: clipboard, line: ln, onkey: onkey})
                 text = [revisions]
             }
         }
@@ -227,7 +229,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
                 // if user add a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
                 postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-                state: state, cb: clipboard, line: ln})
+                state: state, cb: clipboard, line: ln, onkey:onkey})
                 text = [revisions]
             }
         }

@@ -363,22 +363,22 @@ document.body.onkeyup = function (e) { // save every keystroke
             getEditingText();
             if(state == 1){
             console.log(e.key);
-            chrome.runtime.sendMessage({editingFile: filename,message: "cut", revisions: editingParagraph, text: paragraph, cutted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+            chrome.runtime.sendMessage({editingFile: filename,message: "cut", revisions: editingParagraph, text: paragraph, cutted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
             state = 0
             }
             else if(state == 2){
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "copy", revisions: editingParagraph, text: paragraph, copied: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+                chrome.runtime.sendMessage({editingFile: filename, message: "copy", revisions: editingParagraph, text: paragraph, copied: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
                 state = 0
             }
             else if(state == 3){
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "paste", revisions: editingParagraph, text: paragraph, pasted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+                chrome.runtime.sendMessage({editingFile: filename, message: "paste", revisions: editingParagraph, text: paragraph, pasted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
                 state = 0
             }
             else{
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "listeners", revisions: editingParagraph, text: paragraph,  edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+                chrome.runtime.sendMessage({editingFile: filename, message: "listeners", revisions: editingParagraph, text: paragraph,  edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
             }
             paragraph = editingParagraph;
             paragraphArray = edittingArray;

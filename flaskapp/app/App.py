@@ -520,8 +520,16 @@ class MainClass(Resource):
                 info = self.copyHandler(info)
                 pre_state = 2
             elif ((info['onkey'] in "zZyY") and pre_state == 3) or state == 3:
-                pre_text = self.sentence_reform(info["text"].splitlines(keepends=True))
-                cur_text = self.sentence_reform(info["revision"].splitlines(keepends=True))
+                if info['onkey'] in "zZyY":
+                    text = ""
+                    for each in info["revision"]:
+                        if each[0] == 0 or each[0] == -1:
+                            text += each[1]
+                    pre_text = self.sentence_reform(text.splitlines(keepends=True))
+                    cur_text = self.sentence_reform(info["text"].splitlines(keepends=True))
+                else:
+                    pre_text = self.sentence_reform(info["text"].splitlines(keepends=True))
+                    cur_text = self.sentence_reform(info["revision"].splitlines(keepends=True))
                 pre = []
                 cur = []
                 for s in pre_text:

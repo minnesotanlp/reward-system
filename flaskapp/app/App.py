@@ -35,7 +35,6 @@ MEMORY = 1
 suggestion = "abc"
 same_line_before = ""
 same_line_after = ""
-pre_state = -1
 
 @dataclass
 class State:
@@ -488,10 +487,13 @@ class MainClass(Resource):
 
     def post(self):
         try:
-            global pre_state
             info = request.get_json(force=True)
             print(info)
             state = info['state']
+            try:
+                onkey = info['onkey']
+            except:
+                onkey = ""
             if state == "user_selection":
                 print("more detail in the future")
             elif state == "assist":
@@ -518,9 +520,8 @@ class MainClass(Resource):
                 info.pop("current_content")
             elif state == 2:
                 info = self.copyHandler(info)
-                pre_state = 2
-            elif ((info['onkey'] in "zZyY") and pre_state == 3) or state == 3:
-                if info['onkey'] in "zZyY":
+            elif (onkey in "zZyY" and len(info['revision']) >= 4) or state == 3:
+                if onkey in "zZyY":
                     text = ""
                     for each in info["revision"]:
                         if each[0] == 0 or each[0] == -1:
@@ -548,11 +549,10 @@ class MainClass(Resource):
                     info["changes"] = '(' + str(lineNum) + ',' + str(charNum) + ')' + change
                 else:
                     info["changes"] = "no change"
-                pre_state = 3
             else:
                 changes = self.typeHandler(info)
                 info["changes"] = changes
-                pre_state = info['state']
+
             if state == 0 or state == 4:
                 info.pop('line')
                 info.pop("cb")

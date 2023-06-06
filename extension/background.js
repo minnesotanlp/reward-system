@@ -70,6 +70,12 @@ chrome.runtime.onMessage.addListener(
                prelineNumber = lineNumber
            }
         }
+        else if (request.message == "undo") {
+            console.log("***** undo *****");
+            console.log(request);
+            text.push(request.text);
+            trackWriterAction(0, request.text, request.revisions, lineNumber);
+        }
         else if (request.message == "hidden") {
             // process edits, find the diff, as additions or deletions
            console.log("***** hidden *****");
@@ -215,7 +221,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
         else if(diff[1][0] === -1) {
             change = "deletion";
 
-            if ((diff[1][1] == '\n' || diff[1][1].includes(' '))|| state != 0){
+            if ((diff[1][1].includes('\n') || diff[1][1].includes(' '))|| state != 0){
                // if user delete a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
                 postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
@@ -225,7 +231,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
         }
         else if (diff[1][0] === 1){
             change = "addition";
-            if ((diff[1][1] == '\n' || diff[1][1].includes(' ')) || state != 0){
+            if ((diff[1][1].includes('\n') || diff[1][1].includes(' ')) || state != 0){
                 // if user add a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
                 postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,

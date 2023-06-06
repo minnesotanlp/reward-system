@@ -203,6 +203,13 @@ window.addEventListener("load", async function(){
     let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
     let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
 
+    // Add event listeners to detect user undo/redo action
+    var inputElements = document.querySelectorAll(".cm-content.cm-lineWrapping");
+    inputElements[0].addEventListener("beforeinput", function(event) {
+        checkUndoOrRevert(inputElements, event);
+    });
+
+
     lines = textarea[0].childNodes;
     var length = lines.length;
     for (var k = 1; k < length; k++) {
@@ -384,6 +391,21 @@ document.body.onkeyup = function (e) { // save every keystroke
             paragraphArray = edittingArray;
             paragraphLines = edittingLines;
         }
+    }
+}
+
+function checkUndoOrRevert(element, event) {
+  console.log("Input type: ", event.inputType);
+  if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
+    console.log("Undo or revert event detected");
+    getEditingText();
+    if (EXTENSION_TOGGLE) {
+        chrome.runtime.sendMessage({editingFile: filename, message: "undo", revisions: editingParagraph, text: paragraph, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+    }
+    paragraph = editingParagraph;
+    paragraphArray = edittingArray;
+    paragraphLines = edittingLines;
+    destroy();
     }
 }
 

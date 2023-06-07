@@ -194,11 +194,11 @@ window.addEventListener("load", async function(){
     paragraph = "";
     paragraphArray = [];
     paragraphLines = [];
-    let listenNode = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0];
-    while (!document.contains(listenNode) || listenNode == undefined) {
-        console.log("attempt read")
+    let loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
+    while (loadNode == undefined) {
+        console.log("here")
         await sleep(100); // Adjust the delay time as needed
-        listenNode = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0];
+        loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
     }
     let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
     let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
@@ -208,7 +208,6 @@ window.addEventListener("load", async function(){
     inputElements[0].addEventListener("beforeinput", function(event) {
         checkUndoOrRevert(inputElements, event);
     });
-
 
     lines = textarea[0].childNodes;
     var length = lines.length;

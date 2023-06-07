@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify
 from flask_pymongo import PyMongo
 from flask_restx import Api, Resource, fields
 from nltk.tokenize import sent_tokenize, word_tokenize
+from pymongo import MongoClient
 
 import nltk
 nltk.download('punkt')
@@ -45,7 +46,10 @@ def get_collection():
     return db[COLLECTION_NAME]
 
 # create database instance
-db = get_collection()
+# db = get_collection()
+client = MongoClient('localhost', 27017)
+db = client.flask_db
+activity = db.activity
 
 check = 0
 @name_space.route("/activity")
@@ -397,7 +401,7 @@ class MainClass(Resource):
             #info["project_id"] = request.path
 
             # add document to database
-            # db.activity.insert_one(info)
+            activity.insert_one(info)
             print(info)
 
             return {

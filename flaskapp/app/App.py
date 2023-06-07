@@ -9,6 +9,8 @@ import minichain
 import os
 import diff_match_patch as dmp_module
 dmp = dmp_module.diff_match_patch()
+from nltk.tokenize import sent_tokenize, word_tokenize
+from pymongo import MongoClient
 
 import spacy
 sent_tokenizer = spacy.load("en_core_web_sm")
@@ -63,6 +65,36 @@ def run_chatgpt(before, after, current, level):
         state = prompt(state)
         return state.memory[-1][1]
 
+import pymongo
+# for using Azure CosmoDB
+def get_collection():
+    # Get connection info from environment variables
+    print("STARTING AGAIN")
+    CONNECTION_STRING = os.getenv('CONNECTION_STRING')
+    DB_NAME = os.getenv('DB_NAME')
+    COLLECTION_NAME = os.getenv('COLLECTION_NAME')
+
+    print("CONNECTION STRING: ", CONNECTION_STRING)
+    print("DB NAME: ", DB_NAME)
+    print("COLLECTION NAME: ", COLLECTION_NAME)
+
+    # Create a MongoClient
+    client = pymongo.MongoClient(CONNECTION_STRING)
+    try:
+        client.server_info()  # validate connection string
+    except pymongo.errors.ServerSelectionTimeoutError:
+        raise TimeoutError("Invalid API for MongoDB connection string or timed out when attempting to connect")
+
+    db = client[DB_NAME]
+    return db[COLLECTION_NAME]
+
+# create database instance
+# db = get_collection()
+client = MongoClient('localhost', 27017)
+db = client.flask_db
+activity = db.activity
+
+check = 0
 @name_space.route("/activity")
 class MainClass(Resource):
     check = 0
@@ -563,7 +595,8 @@ class MainClass(Resource):
                 info.pop('copyLineNumbers')
                 info["copy"] = info.pop("cb")
 
-            #db.activity.insert_one(info)
+            # add document to database
+            activity.insert_one(info)
             print(info)
 
             return {

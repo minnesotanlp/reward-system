@@ -1,11 +1,5 @@
-let version = "legacy";
-let editor = document.getElementsByClassName("ace_editor")[0];
-if (editor === null || editor === undefined) {
-    editor = document.getElementsByClassName("editor")[0];
-    version = "new";
-}
+editor = document.getElementsByClassName("editor")[0];
 console.log(editor);
-console.log(version);
 
 let paragraph = "";
 let editingParagraph = "";
@@ -13,7 +7,6 @@ let state = 0;
 let pasteData = "";
 let clipboardData = "";
 let project_id = ""
-const reg = /(\\\S+$)/g;
 const reg1 = /(\\author(?:\[(\d*)\])*{+[^}\n\\]+}*)/g;
 const reg2 = /(\\affil(?:\[(\d*)\])*{+[^}\n\\]+}*)/g;
 let file;
@@ -33,7 +26,7 @@ let idx = null;
 let same_line_before = ""
 let same_line_after = ""
 
-let EXTENSION_TOGGLE = false
+let EXTENSION_TOGGLE = true
 let tpcontent = "Hello, This is a tooltip!"
 
 chrome.runtime.onMessage.addListener(
@@ -97,28 +90,32 @@ document.body.addEventListener('paste', (event) => {
 });
 
 function getEditingText() { // find areas in current file that reader may be reading
-    let textarea = document.getElementsByClassName("ace_line_group");
-    let linearea = document.getElementsByClassName("ace_gutter-cell");
-    if (version == "new") {
-        textarea = document.getElementsByClassName("cm-line");
-        linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
-    }
+    editingParagraph = "";
     edittingArray = [];
     edittingLines = [];
+    let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
+    let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
+    console.log(linearea);
 
-    editingParagraph = textarea[0].textContent;
-    edittingArray.push(textarea[0].textContent);
-    edittingLines.push(linearea[0].textContent);
-    for (var i = 1; i < textarea.length; i++) { // rebuilding the editor view everytime is inefficient..?
-        let line = '\n' + textarea[i].textContent;
-        line.replace(reg, '');
+    lines = textarea[0].childNodes;
+    var length = lines.length;
+    for (var k = 1; k < length; k++) {
+        line = lines[k].innerText;
+        if(line === "\n"){
+           line = "";
+        }
+        if(k > 1){
+            line = "\n"+line;
+        }
         editingParagraph += line;
         edittingArray.push(line);
-        edittingLines.push(linearea[i].textContent);
+        edittingLines.push(linearea[k].textContent);
     }
+
     editingParagraph = editingParagraph.replace(reg1, '\\author{anonymous}');
     editingParagraph = editingParagraph.replace(reg2, '\\affil{anonymous}');
     destroy();
+    console.log(editingParagraph);
     console.log(edittingArray);
     console.log(edittingLines);
 
@@ -149,15 +146,14 @@ const scrollPost = (mutations) =>{
         destroy();
     }
 }
-let targetNode = document.querySelector('.ace_content');
-console.log(targetNode);
-if (version == "new") {
-    console.log(version);
-    targetNode = document.querySelector('div.cm-content');
-}
-console.log(targetNode);
-const config = {attributeFilter: ["style"],attributeOldValue: true};
 
+// scroll mutation observer setup
+let targetNode = undefined;
+let config = undefined
+targetNode = document.querySelector('.cm-scroller');
+
+config = {attributeFilter: ["style"],attributeOldValue: true};
+console.log(targetNode);
 const scrollObserver = new MutationObserver(scrollPost);
 scrollObserver.observe(targetNode, config);
 
@@ -166,13 +162,19 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const filePost = () =>{
+async function filePost(){
     editingObserver.disconnect();
     file = document.querySelector('[aria-selected = "true"]');
     console.log(file);
     f = file.getAttribute("aria-label");
     console.log(f);
-    sleep(500).then(() => {
+
+    let loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
+    while (loadNode == undefined) {
+        console.log("here")
+        await sleep(100); // Adjust the delay time as needed
+        loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
+    }
     getEditingText();
     console.log(editingParagraph);
     if (EXTENSION_TOGGLE) {
@@ -183,33 +185,49 @@ const filePost = () =>{
     paragraphArray = edittingArray;
     paragraphLines = edittingLines;
     destroy();
-    editingObserver.observe(file, {attributeFilter: ["aria-selected", "selected"]});});
+    editingObserver.observe(file, {attributeFilter: ["aria-selected", "selected"]});
 }
+
 const editingObserver = new MutationObserver(filePost);
 
-window.addEventListener("load", function(){
-    sleep(500).then(() => {
-    let textarea = document.getElementsByClassName("ace_line_group");
-    let linearea = document.getElementsByClassName("ace_gutter-cell");
-    if (version == "new") {
-        textarea = document.getElementsByClassName("cm-line");
-        linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
-        console.log(linearea);
-        //console.log(linearea[0]);
-        //console.log(linearea[0].childNodes);
+window.addEventListener("load", async function(){
+    paragraph = "";
+    paragraphArray = [];
+    paragraphLines = [];
+    let loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
+    while (loadNode == undefined) {
+        console.log("here")
+        await sleep(100); // Adjust the delay time as needed
+        loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
     }
-    paragraph = textarea[0].textContent;
-    paragraphArray.push(textarea[0].textContent);
-    paragraphLines.push(linearea[0].textContent);
-    for (var i = 1; i < textarea.length; i++) { // rebuilding the editor view everytime is inefficient..?
-        let line = '\n' + textarea[i].textContent;
-        line.replace(reg, '');
+    let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
+    let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
+
+    // Add event listeners to detect user undo/redo action
+    var inputElements = document.querySelectorAll(".cm-content.cm-lineWrapping");
+    inputElements[0].addEventListener("beforeinput", function(event) {
+        checkUndoOrRevert(inputElements, event);
+    });
+
+    lines = textarea[0].childNodes;
+    var length = lines.length;
+    for (var k = 1; k < length; k++) {
+        line = lines[k].innerText;
+        if(line === "\n"){
+           line = "";
+        }
+        if(k > 1){
+            line = "\n"+line;
+        }
         paragraph += line;
         paragraphArray.push(line);
-        paragraphLines.push(linearea[i].textContent);
+        paragraphLines.push(linearea[k].textContent);
     }
     paragraph = paragraph.replace(reg1, '\\author{anonymous}');
     paragraph = paragraph.replace(reg2, '\\affil{anonymous}');
+
+    console.log(paragraph)
+    console.log(paragraphLines)
     // valid for both legacy and non-legacy
     project_id = document.querySelector('meta[name="ol-project_id"]').content
     file = document.querySelector('[aria-selected = "true"]');
@@ -229,7 +247,7 @@ window.addEventListener("load", function(){
     })
     const fileObserver = new MutationObserver(filePost);
     const fileConfig = {attributeFilter: ["aria-selected", "selected"]};
-    fileObserver.observe(file, fileConfig);});
+    fileObserver.observe(file, fileConfig);
 });
 
 
@@ -239,12 +257,17 @@ function tooltipClick(event) {
     tooltip.parentNode.removeChild(tooltip);
     tooltip = null;
     document.removeEventListener('click', tooltipClick);
+    chrome.runtime.sendMessage({message: "user_selection", accept: false});
   }
   else if (tooltip && tooltip.contains(event.target)){
     console.log("1: ",same_line_before);
     console.log("2: ",tpcontent);
     console.log("3: ",same_line_after);
     lines[idx].innerText = same_line_before+tpcontent+same_line_after;
+    tooltip.parentNode.removeChild(tooltip);
+    tooltip = null;
+    document.removeEventListener('click', tooltipClick);
+    chrome.runtime.sendMessage({message: "user_selection", accept: true});
   }
 }
 
@@ -316,11 +339,9 @@ document.body.onkeyup = function (e) { // save every keystroke
                 line = "\n\n";
             }
             if (k < i){
-                line.replace(reg, '');
                 pre_content += line;
             }
             else if (k > i){
-                line.replace(reg, '');
                 pos_content += line;
             }
         }
@@ -333,7 +354,6 @@ document.body.onkeyup = function (e) { // save every keystroke
         console.log(lines[i].innerText);
         console.log(pos_content);
 
-        // get the position of tooltip
         tptop = selected_pos.y + selected_pos.height;
         tpleft = selected_pos.x + selected_pos.width;
         idx = i;
@@ -349,27 +369,42 @@ document.body.onkeyup = function (e) { // save every keystroke
             getEditingText();
             if(state == 1){
             console.log(e.key);
-            chrome.runtime.sendMessage({editingFile: filename,message: "cut", revisions: editingParagraph, text: paragraph, cutted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+            chrome.runtime.sendMessage({editingFile: filename,message: "cut", revisions: editingParagraph, text: paragraph, cutted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
             state = 0
             }
             else if(state == 2){
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "copy", revisions: editingParagraph, text: paragraph, copied: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+                chrome.runtime.sendMessage({editingFile: filename, message: "copy", revisions: editingParagraph, text: paragraph, copied: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
                 state = 0
             }
             else if(state == 3){
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "paste", revisions: editingParagraph, text: paragraph, pasted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+                chrome.runtime.sendMessage({editingFile: filename, message: "paste", revisions: editingParagraph, text: paragraph, pasted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
                 state = 0
             }
             else{
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "listeners", revisions: editingParagraph, text: paragraph,  edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+                chrome.runtime.sendMessage({editingFile: filename, message: "listeners", revisions: editingParagraph, text: paragraph,  edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
             }
             paragraph = editingParagraph;
             paragraphArray = edittingArray;
             paragraphLines = edittingLines;
         }
+    }
+}
+
+function checkUndoOrRevert(element, event) {
+  console.log("Input type: ", event.inputType);
+  if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
+    console.log("Undo or revert event detected");
+    getEditingText();
+    if (EXTENSION_TOGGLE) {
+        chrome.runtime.sendMessage({editingFile: filename, message: "undo", revisions: editingParagraph, text: paragraph, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+    }
+    paragraph = editingParagraph;
+    paragraphArray = edittingArray;
+    paragraphLines = edittingLines;
+    destroy();
     }
 }
 

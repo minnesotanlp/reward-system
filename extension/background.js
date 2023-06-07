@@ -1,7 +1,7 @@
 let serverURL;
-// serverURL = "http://127.0.0.1:5000/"
+serverURL = "http://127.0.0.1:5000/"
 // serverURL = "http://localhost"
-serverURL = "your_url_here";
+// serverURL = "your_url_here";
 let headers = new Headers();
 headers.append('GET', 'POST', 'OPTIONS');
 headers.append('Access-Control-Allow-Origin', 'http://127.0.0.1:5000/');
@@ -19,6 +19,7 @@ let lineNumber;
 let copyLineNumbers;
 let projectID = "no url"
 let suggestion = ""
+let onkey = ""
 
 chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
@@ -26,13 +27,25 @@ chrome.runtime.onMessage.addListener(
         text = text.filter(function(element) {return element !== undefined;});
         projectID = request.project_id
         filename = request.editingFile;
+        onkey = request.onkey
+        if (request.message == "user_selection"){
+            var d = new Date();
+            var ms = d.getMilliseconds();
+            var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
+            if (request.accept == false){
+                postWriterText({state: "user_selection",timestamp: time, accept: false});
+            }
+            else{
+                postWriterText({state: "user_selection",timestamp: time, accept: true});
+            }
+        }
         if (request.message == "assist"){
             var d = new Date();
             var ms = d.getMilliseconds();
             var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
             postWriterText({state: "assist",timestamp: time, project: projectID, file: filename, pre_content: request.pre_content,
             pos_content: request.pos_content, selected_text: request.selected_text, current_content: request.current_line_content,
-            current_line_content: request.current_line_content, line: request.line});
+            line: request.line});
             generateText();
         }
         else{
@@ -41,9 +54,8 @@ chrome.runtime.onMessage.addListener(
         if (request.message == "listeners") {
             // process edits, find the diff, as additions or deletions
            console.log("***** press *****");
+           console.log(request)
            text.push(request.text);
-           console.log(text)
-           console.log(request.revisions);
            if (prelineNumber == null){
                prelineNumber = lineNumber;
            }
@@ -57,6 +69,12 @@ chrome.runtime.onMessage.addListener(
                trackWriterAction(0, request.text, request.revisions, lineNumber);
                prelineNumber = lineNumber
            }
+        }
+        else if (request.message == "undo") {
+            console.log("***** undo *****");
+            console.log(request);
+            text.push(request.text);
+            trackWriterAction(0, request.text, request.revisions, lineNumber);
         }
         else if (request.message == "hidden") {
             // process edits, find the diff, as additions or deletions
@@ -171,7 +189,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
     var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,)
     if (state == 3){
         postWriterText({timestamp: time, project: projectID, file: filename, text: writerText, revision: revisions,
-        state: state, cb: clipboard, line: ln})
+        state: state, cb: clipboard, line: ln, onkey: onkey})
         text = [revisions]
         clipboard = "";
     }
@@ -179,14 +197,14 @@ function trackWriterAction(state, writerText, revisions, ln) {
             change = "deletion";
             changemade = difference(text[0], revisions)
             postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-             state: state, cb: clipboard, line: ln})
+             state: state, cb: clipboard, line: ln, onkey: onkey})
             text = [revisions]
     }
     else if (diff[0][1] === '\n' || diff[0][1] === ' ') {
         change = "addition";
         changemade = difference(text[0], revisions)
         postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-         state: state, cb: clipboard, line: ln})
+         state: state, cb: clipboard, line: ln, onkey: onkey})
         text = [revisions]
     }
     else if (diff.length < 2 && (state== 0 || state == 4)) {
@@ -196,28 +214,28 @@ function trackWriterAction(state, writerText, revisions, ln) {
         if (state == 1 || state == 2) {
             change = "cut/copy";
             postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: diff,
-            state: state, cb: clipboard, line: ln, copyLineNumbers:copyLineNumbers})
+            state: state, cb: clipboard, line: ln, copyLineNumbers:copyLineNumbers, onkey: onkey})
             text = [revisions]
             clipboard = "";
         }
         else if(diff[1][0] === -1) {
             change = "deletion";
 
-            if ((diff[1][1] == '\n' || diff[1][1].includes(' '))|| state != 0){
+            if ((diff[1][1].includes('\n') || diff[1][1].includes(' '))|| state != 0){
                // if user delete a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
                 postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-                state: state, cb: clipboard, line: ln})
+                state: state, cb: clipboard, line: ln, onkey: onkey})
                 text = [revisions]
             }
         }
         else if (diff[1][0] === 1){
             change = "addition";
-            if ((diff[1][1] == '\n' || diff[1][1].includes(' ')) || state != 0){
+            if ((diff[1][1].includes('\n') || diff[1][1].includes(' ')) || state != 0){
                 // if user add a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
                 postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-                state: state, cb: clipboard, line: ln})
+                state: state, cb: clipboard, line: ln, onkey:onkey})
                 text = [revisions]
             }
         }

@@ -13,10 +13,10 @@ let file;
 let filename;
 
 let paragraphArray = [];
-let edittingArray = [];
+let editingArray = [];
 
 let paragraphLines = [];
-let edittingLines = [];
+let editingLines = [];
 
 let tooltip = null;
 let tptop = null;
@@ -55,8 +55,8 @@ chrome.runtime.onMessage.addListener(
             if (request.toggle) {
                 getEditingText();
                 paragraph = editingParagraph;
-                paragraphArray = edittingArray;
-                paragraphLines = edittingLines;
+                paragraphArray = editingArray;
+                paragraphLines = editingLines;
                 console.log("CONTENT ON");
             } else {
                 console.log("CONTENT OFF");
@@ -91,33 +91,32 @@ document.body.addEventListener('paste', (event) => {
 
 function getEditingText() { // find areas in current file that reader may be reading
     editingParagraph = "";
-    edittingArray = [];
-    edittingLines = [];
+    editingArray = [];
+    editingLines = [];
     let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
     let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
-    console.log(linearea);
 
     lines = textarea[0].childNodes;
-    var length = lines.length;
+    var length = linearea.length;
     for (var k = 1; k < length; k++) {
         line = lines[k].innerText;
         if(line === "\n"){
            line = "";
         }
         if(k > 1){
+            editingArray.push(line);
             line = "\n"+line;
         }
         editingParagraph += line;
-        edittingArray.push(line);
-        edittingLines.push(linearea[k].textContent);
+        editingLines.push(linearea[k].textContent);
     }
 
     editingParagraph = editingParagraph.replace(reg1, '\\author{anonymous}');
     editingParagraph = editingParagraph.replace(reg2, '\\affil{anonymous}');
     destroy();
     console.log(editingParagraph);
-    console.log(edittingArray);
-    console.log(edittingLines);
+    console.log(editingArray);
+    console.log(editingLines);
 
     return;
 }
@@ -126,36 +125,24 @@ function getEditingText() { // find areas in current file that reader may be rea
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === 'hidden') {
       if (EXTENSION_TOGGLE) {
-          chrome.runtime.sendMessage({message: "hidden", revisions: editingParagraph, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+          chrome.runtime.sendMessage({message: "hidden", revisions: editingParagraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
       }
   }
 });
 
 
 const scrollPost = (mutations) =>{
-    if (mutations[0].target.style.top != mutations[0].oldValue.substring(22,25)){
-        // console.log(mutations);
-        console.log("***** scroll *****")
-        getEditingText();
-        if (EXTENSION_TOGGLE) {
-            chrome.runtime.sendMessage({editingFile: filename, message: "scroll", revisions: editingParagraph, text: paragraph, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
-        }
-        paragraph = editingParagraph;
-        paragraphArray = edittingArray;
-        paragraphLines = edittingLines;
-        destroy();
+    console.log(mutations)
+    console.log("***** scroll *****")
+    getEditingText();
+    if (EXTENSION_TOGGLE) {
+        chrome.runtime.sendMessage({editingFile: filename, message: "scroll", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
     }
+    paragraph = editingParagraph;
+    paragraphArray = editingArray;
+    paragraphLines = editingLines;
+    destroy();
 }
-
-// scroll mutation observer setup
-let targetNode = undefined;
-let config = undefined
-targetNode = document.querySelector('.cm-scroller');
-
-config = {attributeFilter: ["style"],attributeOldValue: true};
-console.log(targetNode);
-const scrollObserver = new MutationObserver(scrollPost);
-scrollObserver.observe(targetNode, config);
 
 
 function sleep(ms) {
@@ -178,12 +165,12 @@ async function filePost(){
     getEditingText();
     console.log(editingParagraph);
     if (EXTENSION_TOGGLE) {
-        chrome.runtime.sendMessage({editingFile: filename, message: "switch", revisions: editingParagraph, text: paragraph, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+        chrome.runtime.sendMessage({editingFile: filename, message: "switch", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
     }
     filename = f;
     paragraph = editingParagraph;
-    paragraphArray = edittingArray;
-    paragraphLines = edittingLines;
+    paragraphArray = editingArray;
+    paragraphLines = editingLines;
     destroy();
     editingObserver.observe(file, {attributeFilter: ["aria-selected", "selected"]});
 }
@@ -210,7 +197,9 @@ window.addEventListener("load", async function(){
     });
 
     lines = textarea[0].childNodes;
-    var length = lines.length;
+    var length = linearea.length;
+    console.log("textlen", lines.length)
+    console.log("linelen", length)
     for (var k = 1; k < length; k++) {
         line = lines[k].innerText;
         if(line === "\n"){
@@ -245,9 +234,20 @@ window.addEventListener("load", async function(){
             destroy();
         }
     })
+
+    // switch document mutation observer setup
     const fileObserver = new MutationObserver(filePost);
     const fileConfig = {attributeFilter: ["aria-selected", "selected"]};
     fileObserver.observe(file, fileConfig);
+
+    // scroll mutation observer setup
+    let scrollNode = undefined;
+    let scrollConfig = undefined
+    scrollNode = document.getElementsByClassName('cm-gutterElement')[1];
+    console.log(scrollNode)
+    scrollConfig = {attributeFilter: ["style"], attributeOldValue: true};
+    const scrollObserver = new MutationObserver(scrollPost);
+    scrollObserver.observe(scrollNode, scrollConfig);
 });
 
 
@@ -369,41 +369,40 @@ document.body.onkeyup = function (e) { // save every keystroke
             getEditingText();
             if(state == 1){
             console.log(e.key);
-            chrome.runtime.sendMessage({editingFile: filename,message: "cut", revisions: editingParagraph, text: paragraph, cutted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
+            chrome.runtime.sendMessage({editingFile: filename,message: "cut", revisions: editingParagraph, text: paragraph, cutted: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
             state = 0
             }
             else if(state == 2){
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "copy", revisions: editingParagraph, text: paragraph, copied: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
+                chrome.runtime.sendMessage({editingFile: filename, message: "copy", revisions: editingParagraph, text: paragraph, copied: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
                 state = 0
             }
             else if(state == 3){
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "paste", revisions: editingParagraph, text: paragraph, pasted: pasteData, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
+                chrome.runtime.sendMessage({editingFile: filename, message: "paste", revisions: editingParagraph, text: paragraph, pasted: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
                 state = 0
             }
             else{
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "listeners", revisions: editingParagraph, text: paragraph,  edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
+                chrome.runtime.sendMessage({editingFile: filename, message: "listeners", revisions: editingParagraph, text: paragraph,  editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
             }
             paragraph = editingParagraph;
-            paragraphArray = edittingArray;
-            paragraphLines = edittingLines;
+            paragraphArray = editingArray;
+            paragraphLines = editingLines;
         }
     }
 }
 
 function checkUndoOrRevert(element, event) {
-  console.log("Input type: ", event.inputType);
   if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
     console.log("Undo or revert event detected");
     getEditingText();
     if (EXTENSION_TOGGLE) {
-        chrome.runtime.sendMessage({editingFile: filename, message: "undo", revisions: editingParagraph, text: paragraph, edittingLines: edittingLines, edittingArray: edittingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+        chrome.runtime.sendMessage({editingFile: filename, message: "undo", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
     }
     paragraph = editingParagraph;
-    paragraphArray = edittingArray;
-    paragraphLines = edittingLines;
+    paragraphArray = editingArray;
+    paragraphLines = editingLines;
     destroy();
     }
 }
@@ -413,9 +412,9 @@ function destroy() {
         paragraph = "";
         editingParagraph = "";
         paragraphArray = [];
-        edittingArray = [];
+        editingArray = [];
         project_id = ""
         paragraphLines = [];
-        edittingLines = [];
+        editingLines = [];
     }
 }

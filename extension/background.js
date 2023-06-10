@@ -49,12 +49,12 @@ chrome.runtime.onMessage.addListener(
             generateText();
         }
         else{
-            lineNumber = findLineEdit(request.edittingLines, request.edittingArray, request.paragraphLines, request.paragraphArray);
+            console.log(request)
+            lineNumber = findLineEdit(request.editingLines, request.editingArray, request.paragraphLines, request.paragraphArray);
         }
         if (request.message == "listeners") {
             // process edits, find the diff, as additions or deletions
            console.log("***** press *****");
-           console.log(request)
            text.push(request.text);
            if (prelineNumber == null){
                prelineNumber = lineNumber;
@@ -72,14 +72,12 @@ chrome.runtime.onMessage.addListener(
         }
         else if (request.message == "undo") {
             console.log("***** undo *****");
-            console.log(request);
             text.push(request.text);
             trackWriterAction(0, request.text, request.revisions, lineNumber);
         }
         else if (request.message == "hidden") {
             // process edits, find the diff, as additions or deletions
            console.log("***** hidden *****");
-           console.log(request.revisions);
            // text.push(request.text);
            if (text[0] != null && request.revisions != null){
                trackWriterAction(4, text[0], request.revisions, lineNumber);
@@ -89,8 +87,9 @@ chrome.runtime.onMessage.addListener(
         }
         else if (request.message == "scroll"){
             console.log("***** scroll *****");
-            console.log(request.revisions);
             if (text[0] !== undefined && text.length > 1){
+                lineNumber = findLineEdit(request.paragraphLines, request.paragraphArray, text[0].split('\n'), request.paragraphArray);
+                console.log(lineNumber)
                 trackWriterAction(4, text[0], request.text, lineNumber);
                 prelineNumber = lineNumber
             }
@@ -98,7 +97,6 @@ chrome.runtime.onMessage.addListener(
         }
         else if (request.message == "switch"){
             console.log("***** switch *****");
-            console.log(request.revisions);
             if (text[0] !== undefined && text.length > 1){
                 trackWriterAction(4, text[0], request.text, lineNumber);
                 prelineNumber = lineNumber
@@ -122,7 +120,7 @@ chrome.runtime.onMessage.addListener(
            if(text[0] !== undefined){
             trackWriterAction(4, text[0], request.text, prelineNumber);
            }
-           copyLineNumbers = request.edittingLines
+           copyLineNumbers = request.editingLines
            trackWriterAction(2, request.text, request.revisions, lineNumber);
            text = [request.revisions];
         }
@@ -140,21 +138,19 @@ chrome.runtime.onMessage.addListener(
     }
 );
 
-function findLineEdit(edittingLines, edittingArray, paragraphLines, paragraphArray) {
-    if (edittingArray.length > paragraphArray.length) {  // line(s) added
+function findLineEdit(editingLines, editingArray, paragraphLines, paragraphArray) {
+    if (editingArray.length > paragraphArray.length) {  // line(s) added
         for (let i = 0; i < paragraphArray.length; i++){
-            if (paragraphArray[i] != edittingArray[i]){
-               console.log(parseInt(paragraphLines[i]) + (edittingArray.length - paragraphArray.length));
-               return (parseInt(paragraphLines[i]) + (edittingArray.length - paragraphArray.length))
+            if (paragraphArray[i] != editingArray[i]){
+               return (parseInt(paragraphLines[i]) + (editingArray.length - paragraphArray.length))
             }
         }
-        console.log(edittingLines[edittingArray.length - 1])
-        return edittingLines[edittingArray.length - 1]
+        console.log(editingLines[editingArray.length - 1])
+        return editingLines[editingArray.length - 1]
     } else {
-        for (let i = 0; i < edittingArray.length; i++){
-            if(edittingArray[i] != paragraphArray[i]){
-               console.log(edittingLines[i])
-               return parseInt(edittingLines[i])
+        for (let i = 0; i < editingArray.length; i++){
+            if(editingArray[i] != paragraphArray[i]){
+               return parseInt(editingLines[i])
             }
         }
         console.log("All lines are the same");

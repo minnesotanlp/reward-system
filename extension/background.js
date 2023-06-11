@@ -91,7 +91,7 @@ chrome.runtime.onMessage.addListener(
                 lineNumber = findLineEdit(request.paragraphLines, request.paragraphArray, text[0].split('\n'), request.paragraphArray);
                 console.log(lineNumber)
                 trackWriterAction(4, text[0], request.text, lineNumber);
-                prelineNumber = lineNumber
+                prelineNumber = null
             }
             text = [request.revisions];
         }

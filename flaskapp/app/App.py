@@ -220,7 +220,7 @@ class MainClass(Resource):
                 elif (text[k][1].rfind(" ") != 0) or (text[k][1].rfind("\n") != 0):
                     idx2 = text[k][1].rfind(" ")
                     idx3 = text[k][1].rfind("\n")
-                    if idx3 > idx2 and (idx2 != -1):
+                    if idx3 > idx2:
                         idx2 = idx3
                     if idx2 == -1:
                         front = text[k][1] + front

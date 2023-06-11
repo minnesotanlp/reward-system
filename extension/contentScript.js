@@ -93,22 +93,37 @@ function getEditingText() { // find areas in current file that reader may be rea
     editingParagraph = "";
     editingArray = [];
     editingLines = [];
-    let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
+    let textarea = document.getElementsByClassName("cm-content cm-lineWrapping")[0];
     let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
 
-    lines = textarea[0].childNodes;
+    // Determine whether active line is visible. If count equal to three, active line is NOT visible
+    var elements = textarea.querySelectorAll('div[contenteditable="false"][style]');
+    var count = elements.length;
+
+    lines = textarea.childNodes;
     var length = linearea.length;
-    for (var k = 1; k < length; k++) {
+    var k = 1
+    var offset = 0
+
+    if (lines[1].nextElementSibling.matches('div[contenteditable="false"][style]')){
+        k = count
+        offset = count - 1
+        length = length + offset
+    }
+    else{
+        count = 1
+    }
+    for (; k < length; k++){
         line = lines[k].innerText;
         if(line === "\n"){
            line = "";
         }
-        if(k > 1){
-            editingArray.push(line);
+        editingArray.push(line);
+        if(k > count){
             line = "\n"+line;
         }
         editingParagraph += line;
-        editingLines.push(linearea[k].textContent);
+        editingLines.push(linearea[k - offset].textContent);
     }
 
     editingParagraph = editingParagraph.replace(reg1, '\\author{anonymous}');
@@ -205,11 +220,11 @@ window.addEventListener("load", async function(){
         if(line === "\n"){
            line = "";
         }
+        paragraphArray.push(line);
         if(k > 1){
             line = "\n"+line;
         }
         paragraph += line;
-        paragraphArray.push(line);
         paragraphLines.push(linearea[k].textContent);
     }
     paragraph = paragraph.replace(reg1, '\\author{anonymous}');

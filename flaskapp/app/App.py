@@ -3,9 +3,9 @@ import copy
 from flask import Flask, request, jsonify
 from flask_restx import Api, Resource, fields
 import warnings
-from dataclasses import dataclass
 from typing import List, Tuple
-import minichain
+from dataclasses import dataclass, replace
+from minichain import OpenAI, prompt, show, transform, Mock
 import os
 import diff_match_patch as dmp_module
 dmp = dmp_module.diff_match_patch()
@@ -32,8 +32,7 @@ model = app.model('Recording Writer Actions for Rhetorical Adjustment',
 # db = mongo.db
 
 os.environ["OPENAI_KEY"] = ""
-warnings.filterwarnings("ignore")
-MEMORY = 1
+MEMORY = 0
 suggestion = "abc"
 same_line_before = ""
 same_line_after = ""
@@ -47,23 +46,26 @@ class State:
         memory = self.memory if len(self.memory) < MEMORY else self.memory[1:]
         return State(memory + [(self.human_input, response)])
 
-class ChatPrompt(minichain.TemplatePrompt):
-    template_file = "chatgpt.pmpt.tpl"
-    def parse(self, out: str, inp: State) -> State:
-        result = out.split("Assistant:")[-1]
-        return inp.push(result)
+    def __str__(self):
+        return self.memory[-1][-1]
 
-def run_chatgpt(before, after, current, level):
-    with minichain.start_chain("chatgpt") as backend:
-        prompt = ChatPrompt(backend.OpenAI())
-        state = State([])
-        t = "This is what comes before: \"" + before + "\". Here is what comes after: \"" + after + "\". Please optimize this sentence: \"" + current + "\". The length of sentence should not be too long or too short than previous one."
-        #text_revise = "This is what comes before: \"" + before + "\". Here is what comes after: \"" + after + "\". Please optimize this paragraph: \"" + current + "\". The length of paragraph should not be too long or too short than previous one."
-        # if level:
-        #     t = text_revise
-        state.human_input = t
-        state = prompt(state)
-        return state.memory[-1][1]
+# Chat prompt with memory
+
+@prompt(OpenAI(), template_file="chat.pmpt.tpl")
+def chat_response(model, state: State) -> State:
+    return model.stream(state)
+
+@transform()
+def update(state, chat_output):
+    result = chat_output.split("Assistant:")[-1]
+    return state.push(result)
+
+
+def chat(before, after, current, state):
+    command = "This is what comes before: \"" + before + "\". Here is what comes after: \"" + after + "\". Please paraphrase this sentence/paragraph: \"" + current + "\". The length of sentence should not be too long or too short than previous one."
+    state = replace(state, human_input=command)
+    return update(state, chat_response(state))
+
 
 import pymongo
 # for using Azure CosmoDB
@@ -540,10 +542,11 @@ class MainClass(Resource):
 
                 same_line_before = info["current_content"][:start]
                 same_line_after = info["current_content"][start+len(info["selected_text"]):]
-                suggestion = run_chatgpt(info["pre_content"]+info["current_content"][:start],
+                suggestion = str(chat(info["pre_content"]+info["current_content"][:start],
                   info["current_content"][start+len(info["selected_text"]):]+info["pos_content"],
                   info["selected_text"],
-                  level)
+                  State([])).run())
+
                 info["context above"] = info["pre_content"]+info["current_content"][:start]
                 info["context below"] = info["current_content"][start+len(info["selected_text"]):]+info["pos_content"]
                 info["suggestion"] = suggestion

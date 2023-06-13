@@ -32,6 +32,7 @@ model = app.model('Recording Writer Actions for Rhetorical Adjustment',
 # db = mongo.db
 
 os.environ["OPENAI_KEY"] = ""
+warnings.filterwarnings("ignore")
 MEMORY = 0
 suggestion = "abc"
 same_line_before = ""
@@ -521,6 +522,7 @@ class MainClass(Resource):
 
     def post(self):
         try:
+            global suggestion, same_line_before, same_line_after, selected_text
             info = request.get_json(force=True)
             print(info)
             state = info['state']
@@ -529,26 +531,43 @@ class MainClass(Resource):
             except:
                 onkey = ""
             if state == "user_selection":
-                print("more detail in the future")
+                if info["accept"]:
+                    info["changes"] = selected_text + "->" + suggestion
+                else:
+                    info["changes"] = "All lines are the same"
             elif state == "assist":
                 dmp.Match_Distance = 5000
                 start = dmp.match_main(info["current_content"], info["selected_text"], 0)
-                length = len([each for each in sent_tokenizer(info["selected_text"]).sents])
-                if length == 1:
-                    level = 0
-                else:
-                    level = 1
-                global suggestion, same_line_before, same_line_after
+                end = start + len(info["selected_text"])-1
 
+                # if selected text is not a complete sentence
+                for j in range(end, len(info["current_content"]), 1):
+                    if info["current_content"][j] in ".?!;\n":
+                        end = j + 1
+                        break
+                    end += 1
+                for i in range(start, 0, -1):
+                    if info["current_content"][i] in ".?!;\n":
+                        start = i + 1
+                        break
+                    start -= 1
+
+                selected_text = info["current_content"][start:end]
+                # text on the same line but not selected
                 same_line_before = info["current_content"][:start]
-                same_line_after = info["current_content"][start+len(info["selected_text"]):]
-                suggestion = str(chat(info["pre_content"]+info["current_content"][:start],
-                  info["current_content"][start+len(info["selected_text"]):]+info["pos_content"],
-                  info["selected_text"],
-                  State([])).run())
+                same_line_after = info["current_content"][end:]
 
-                info["context above"] = info["pre_content"]+info["current_content"][:start]
-                info["context below"] = info["current_content"][start+len(info["selected_text"]):]+info["pos_content"]
+                # By combining the text content on the other lines
+                # with the unselected content on the same line, we get the context.
+                # Passing the context to the language model along with the selected content
+                before = info["pre_content"] + same_line_before
+                after = same_line_after + info["pos_content"]
+                suggestion = str(chat(before, after, selected_text, State([])).run())
+
+                # setup all logging info
+                info["selected_text"] = selected_text
+                info["context above"] = before
+                info["context below"] = after
                 info["suggestion"] = suggestion
                 info.pop("pre_content")
                 info.pop("pos_content")

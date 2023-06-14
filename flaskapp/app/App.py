@@ -8,8 +8,8 @@ from dataclasses import dataclass, replace
 from minichain import OpenAI, prompt, show, transform, Mock
 import os
 import diff_match_patch as dmp_module
+import traceback
 dmp = dmp_module.diff_match_patch()
-from nltk.tokenize import sent_tokenize, word_tokenize
 from pymongo import MongoClient
 
 import spacy
@@ -31,7 +31,7 @@ model = app.model('Recording Writer Actions for Rhetorical Adjustment',
 # mongo = PyMongo(application)
 # db = mongo.db
 
-os.environ["OPENAI_KEY"] = ""
+os.environ["OPENAI_API_KEY"] = "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"
 warnings.filterwarnings("ignore")
 MEMORY = 0
 suggestion = "abc"
@@ -463,7 +463,13 @@ class MainClass(Resource):
                     short = cur
                     original_long = original_pre
                     original_short = original_cur
-
+                elif switch == 1 and len(cur) > len(pre):
+                    switch = 0
+                    length = len(pre)
+                    long = cur
+                    short = pre
+                    original_long = original_cur
+                    original_short = original_pre
             if i < len(long):
                 diff_section1.extend(original_short[i - 1:])
                 diff_section2.extend(original_long)
@@ -491,6 +497,13 @@ class MainClass(Resource):
                     short = pre
                     original_long = original_cur
                     original_short = original_pre
+                elif switch == 1 and len(cur) < len(pre):
+                    switch = 0
+                    length = len(cur)
+                    long = pre
+                    short = cur
+                    original_long = original_pre
+                    original_short = original_cur
             if i < len(long):
                 diff_section1.extend(original_long)
                 diff_section2.extend(original_short[i - 1:])
@@ -522,7 +535,7 @@ class MainClass(Resource):
 
     def post(self):
         try:
-            global suggestion, same_line_before, same_line_after, selected_text
+            global suggestion, same_line_before, same_line_after, selected_text, suggTrack
             info = request.get_json(force=True)
             print(info)
             state = info['state']
@@ -532,7 +545,7 @@ class MainClass(Resource):
                 onkey = ""
             if state == "user_selection":
                 if info["accept"]:
-                    info["changes"] = selected_text + "->" + suggestion
+                    info["changes"] = selected_text + "->" + suggTrack
                 else:
                     info["changes"] = "All lines are the same"
             elif state == "assist":
@@ -563,7 +576,7 @@ class MainClass(Resource):
                 before = info["pre_content"] + same_line_before
                 after = same_line_after + info["pos_content"]
                 suggestion = str(chat(before, after, selected_text, State([])).run())
-
+                suggTrack = suggestion
                 # setup all logging info
                 info["selected_text"] = selected_text
                 info["context above"] = before
@@ -627,6 +640,7 @@ class MainClass(Resource):
         except KeyError as e:
             name_space.abort(500, e.__doc__, status="Could not save information", statusCode="500")
         except Exception as e:
+            # print(traceback.print_exc())
             name_space.abort(400, e.__doc__, status="Could not save information", statusCode="400")
 
 if __name__ == "__main__":

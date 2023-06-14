@@ -281,6 +281,10 @@ function tooltipClick(event) {
     lines[idx].innerText = same_line_before+tpcontent+same_line_after;
     tooltip.parentNode.removeChild(tooltip);
     tooltip = null;
+    getEditingText();
+    paragraph = editingParagraph;
+    paragraphArray = editingArray;
+    paragraphLines = editingLines;
     document.removeEventListener('click', tooltipClick);
     chrome.runtime.sendMessage({message: "user_selection", accept: true});
   }

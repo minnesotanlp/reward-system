@@ -31,12 +31,14 @@ model = app.model('Recording Writer Actions for Rhetorical Adjustment',
 # mongo = PyMongo(application)
 # db = mongo.db
 
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = ""
 warnings.filterwarnings("ignore")
 MEMORY = 0
 suggestion = "abc"
 same_line_before = ""
 same_line_after = ""
+selected_text = ""
+
 
 @dataclass
 class State:
@@ -68,36 +70,6 @@ def chat(before, after, current, state):
     return update(state, chat_response(state))
 
 
-import pymongo
-# for using Azure CosmoDB
-def get_collection():
-    # Get connection info from environment variables
-    print("STARTING AGAIN")
-    CONNECTION_STRING = os.getenv('CONNECTION_STRING')
-    DB_NAME = os.getenv('DB_NAME')
-    COLLECTION_NAME = os.getenv('COLLECTION_NAME')
-
-    print("CONNECTION STRING: ", CONNECTION_STRING)
-    print("DB NAME: ", DB_NAME)
-    print("COLLECTION NAME: ", COLLECTION_NAME)
-
-    # Create a MongoClient
-    client = pymongo.MongoClient(CONNECTION_STRING)
-    try:
-        client.server_info()  # validate connection string
-    except pymongo.errors.ServerSelectionTimeoutError:
-        raise TimeoutError("Invalid API for MongoDB connection string or timed out when attempting to connect")
-
-    db = client[DB_NAME]
-    return db[COLLECTION_NAME]
-
-# create database instance
-# db = get_collection()
-client = MongoClient('localhost', 27017)
-db = client.flask_db
-activity = db.activity
-
-check = 0
 @name_space.route("/activity")
 class MainClass(Resource):
     check = 0
@@ -116,8 +88,12 @@ class MainClass(Resource):
                 else:
                     send = suggestion
                     suggestion = "abc"
+                    diffs = dmp.diff_main(selected_text, send)
+                    dmp.diff_cleanupSemantic(diffs)
+                    diffs_html = dmp.diff_prettyHtml(diffs)
                     return {
                         "status": send,
+                        "diffs_html": diffs_html,
                         "same_line_before": same_line_before,
                         "same_line_after": same_line_after
                     }
@@ -171,7 +147,8 @@ class MainClass(Resource):
     def findback(self, i, type, skip, text):
         back = ""
         check = 0
-        if ("\n" in text[i][1]) or (" " in text[i][1] and len(text[i][1]) > 1 and self.exist_and_not_skip(i + 1, text, skip)):
+        if ("\n" in text[i][1]) or (
+                " " in text[i][1] and len(text[i][1]) > 1 and self.exist_and_not_skip(i + 1, text, skip)):
             return check, back
         for k in range(i + 1, len(text)):
             if text[k][0] == skip or len(text[k]) > 2:
@@ -210,7 +187,8 @@ class MainClass(Resource):
     def findfront(self, i, skip, text):
         front = ""
         check = 0
-        if ("\n" in text[i][1]) or (" " in text[i][1] and len(text[i][1]) > 1 and self.exist_and_not_skip(i-1,text, skip)):
+        if ("\n" in text[i][1]) or (
+                " " in text[i][1] and len(text[i][1]) > 1 and self.exist_and_not_skip(i - 1, text, skip)):
             return check, front
         for k in range(i - 1, -1, -1):
             if text[k][0] == skip:
@@ -523,7 +501,7 @@ class MainClass(Resource):
                 diff_sentence2 += diff_section2[m]
 
         if diff_sentence1 == "" and diff_sentence2 == "":
-            change = "no change"
+            change = "All lines are the same"
         elif diff_sentence1 == "" and diff_sentence2 != "":
             change = diff_sentence2 + "--added"
         elif diff_sentence1 != "" and diff_sentence2 == "":
@@ -545,18 +523,18 @@ class MainClass(Resource):
                 onkey = ""
             if state == "user_selection":
                 if info["accept"]:
-                    info["changes"] = selected_text + "->" + suggTrack
+                    info["changes"] = selected_text+"->"+suggTrack
                 else:
                     info["changes"] = "All lines are the same"
             elif state == "assist":
                 dmp.Match_Distance = 5000
                 start = dmp.match_main(info["current_content"], info["selected_text"], 0)
-                end = start + len(info["selected_text"])-1
+                end = start + len(info["selected_text"]) - 1
 
                 # if selected text is not a complete sentence
                 for j in range(end, len(info["current_content"]), 1):
                     if info["current_content"][j] in ".?!;\n":
-                        end = j + 1
+                        end = j+1
                         break
                     end += 1
                 for i in range(start, 0, -1):
@@ -577,6 +555,7 @@ class MainClass(Resource):
                 after = same_line_after + info["pos_content"]
                 suggestion = str(chat(before, after, selected_text, State([])).run())
                 suggTrack = suggestion
+
                 # setup all logging info
                 info["selected_text"] = selected_text
                 info["context above"] = before
@@ -610,12 +589,12 @@ class MainClass(Resource):
                     change = self.pasteHandler(pre, cur, 1)
                 else:
                     change = self.pasteHandler(pre, cur, 2)
-                if change != "no change":
+                if change != "All lines are the same":
                     charNum = self.pasteCountChar(info["text"], info["revision"])
                     lineNum = info['line']
                     info["changes"] = '(' + str(lineNum) + ',' + str(charNum) + ')' + change
                 else:
-                    info["changes"] = "no change"
+                    info["changes"] = "All lines are the same"
             else:
                 changes = self.typeHandler(info)
                 info["changes"] = changes
@@ -631,7 +610,7 @@ class MainClass(Resource):
                 info["copy"] = info.pop("cb")
 
             # add document to database
-            activity.insert_one(info)
+            # activity.insert_one(info)
             print(info)
 
             return {

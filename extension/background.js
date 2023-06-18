@@ -1,7 +1,7 @@
 let serverURL;
-// serverURL = "http://127.0.0.1:5000/"
+serverURL = "http://127.0.0.1:5000/"
 // serverURL = "http://localhost"
-serverURL = "https://115e-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app";
+// serverURL = "https://115e-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app";
 let headers = new Headers();
 headers.append('GET', 'POST', 'OPTIONS');
 headers.append('Access-Control-Allow-Origin', 'http://127.0.0.1:5000/');
@@ -274,7 +274,7 @@ async function generateText() {
     const message = await response.json();
     console.log("from main.py:",message.status);
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.status, same_line_before: message.same_line_before, same_line_after: message.same_line_after}, function (response) {
+        chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.status, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html}, function (response) {
         });
     });
 }

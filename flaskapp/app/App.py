@@ -69,6 +69,34 @@ def chat(before, after, current, state):
     state = replace(state, human_input=command)
     return update(state, chat_response(state))
 
+import pymongo
+# for using Azure CosmoDB
+def get_collection():
+    # Get connection info from environment variables
+    print("STARTING AGAIN")
+    CONNECTION_STRING = os.getenv('CONNECTION_STRING')
+    DB_NAME = os.getenv('DB_NAME')
+    COLLECTION_NAME = os.getenv('COLLECTION_NAME')
+
+    print("CONNECTION STRING: ", CONNECTION_STRING)
+    print("DB NAME: ", DB_NAME)
+    print("COLLECTION NAME: ", COLLECTION_NAME)
+
+    # Create a MongoClient
+    client = pymongo.MongoClient(CONNECTION_STRING)
+    try:
+        client.server_info()  # validate connection string
+    except pymongo.errors.ServerSelectionTimeoutError:
+        raise TimeoutError("Invalid API for MongoDB connection string or timed out when attempting to connect")
+
+    db = client[DB_NAME]
+    return db[COLLECTION_NAME]
+
+# create database instance
+# db = get_collection()
+client = MongoClient('localhost', 27017)
+db = client.flask_db
+activity = db.activity
 
 @name_space.route("/activity")
 class MainClass(Resource):
@@ -610,7 +638,7 @@ class MainClass(Resource):
                 info["copy"] = info.pop("cb")
 
             # add document to database
-            # activity.insert_one(info)
+            activity.insert_one(info)
             print(info)
 
             return {
@@ -619,7 +647,7 @@ class MainClass(Resource):
         except KeyError as e:
             name_space.abort(500, e.__doc__, status="Could not save information", statusCode="500")
         except Exception as e:
-            # print(traceback.print_exc())
+            print(traceback.print_exc())
             name_space.abort(400, e.__doc__, status="Could not save information", statusCode="400")
 
 if __name__ == "__main__":

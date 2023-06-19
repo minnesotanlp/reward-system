@@ -270,7 +270,8 @@ window.addEventListener("load", async function(){
 
     console.log(paragraph)
     console.log(paragraphLines)
-    // valid for both legacy and non-legacy
+
+    //Get project ID, valid for both legacy and non-legacy
     project_id = document.querySelector('meta[name="ol-project_id"]').content
     file = document.querySelector('[aria-selected = "true"]');
     filename = file.getAttribute("aria-label");
@@ -301,8 +302,146 @@ window.addEventListener("load", async function(){
     scrollConfig = {attributeFilter: ["style"], attributeOldValue: true};
     const scrollObserver = new MutationObserver(scrollPost);
     scrollObserver.observe(scrollNode, scrollConfig);
+
+    // Add an AI paraphrase botton
+    var toolbarRight = document.querySelector('.toolbar-right');
+    var AI_Paraphrase_button = document.createElement('div')
+    AI_Paraphrase_button.className = "toolbar-item"
+    AI_Paraphrase_button.innerHTML = `<button class= "btn btn-full-height"><p class= toolbar-label>AI Paraphrase</p></button>`;
+    console.log(AI_Paraphrase_button);
+    var onlineUsers = toolbarRight.querySelector('.online-users');
+    toolbarRight.insertBefore(AI_Paraphrase_button, onlineUsers.nextSibling);
+    AI_Paraphrase_button.addEventListener('click', AI_Paraphrase)
 });
 
+function AI_Paraphrase(){
+    // get selected information such as html element, text, and position relative to viewers' screen
+    try {
+        var selected_element = window.getSelection();
+        var selected_text = selected_element.toString();
+        var selected_range = selected_element.getRangeAt(0); //get the text range
+        var selected_pos = selected_range.getBoundingClientRect();
+    }
+    catch(err){
+        console.log("You are not selecting any text!");
+        return;
+    }
+    // get all the lines and number of lines
+    const cm_content = document.getElementsByClassName("cm-content cm-lineWrapping");
+    console.log(selected_text);
+    console.log("--------------------------------");
+    lines = cm_content[0].childNodes;
+    var length = lines.length;
+    console.log(length)
+    console.log(selected_range);
+
+    var startContainer = selected_range.startContainer
+    while(startContainer.className !== "cm-line"){
+        startContainer = startContainer.parentElement
+    }
+    var endContainer = selected_range.endContainer
+    while(endContainer.className !== "cm-line"){
+        endContainer = endContainer.parentElement
+    }
+    console.log(startContainer);
+    console.log(endContainer);
+    console.log("--------------------------------");
+    console.log(selected_pos);
+    var found_range = undefined;        // The range object of selected elements
+    var DOMRectArray = [];              // An DOMRect object array. DOMRect: the size and position of an element
+    var num_of_rows = 0;                // Number of rows of selected text in Latex editor
+    var i = 1;                          // loop variable
+    start = 0;                      // startContainer's position
+    end = 0;                        // endContainer's position
+    var skipCheck = 0;                  // Whether found the position of startContainer
+    var breakCheck = 0;                 // Whether found the Position of endContainer
+
+    // algorithm to get the selected line.
+    // This could help us get the context and feed into ChatGPT
+    var countStart = 0
+    var countEnd = 0
+    var textArray = []
+    for (; i<length; i++){
+        line = lines[i].innerText;
+        if (line !== '\n'){
+            textArray.push(line);
+        }
+        else{
+            textArray.push('');
+        }
+        if (line === startContainer.innerText){
+            countStart += 1
+        }
+        // the start and end text could be the same
+        if (line ===  endContainer.innerText){
+            countEnd += 1
+        }
+    }
+
+    console.log("countStart: ",countStart)
+    console.log("countEnd: ",countEnd)
+    for (i=1; i<length; i++){
+        line = lines[i].innerText;
+        console.log(line);
+        if (skipCheck == 0 && line === startContainer.innerText){
+            console.log("here");
+            found_range = lines[i].ownerDocument.createRange();
+            found_range.selectNodeContents(lines[i]);
+
+            DOMRectArray = Array.from(found_range.getClientRects())
+            num_of_rows = DOMRectArray.length / countEnd
+            if (DOMRectArray.slice(start, start + num_of_rows).some((rec) => rec.top.toFixed(3) === selected_pos.top.toFixed(3))){
+                // reassign "start". Now "start" is no longer a loop variable but start position of selection
+                start = i
+                skipCheck = 1;
+            }
+            else{
+                start = start + num_of_rows
+            }
+        }
+        if (skipCheck == 1 && line === endContainer.innerText){
+            console.log("here2");
+            found_range = lines[i].ownerDocument.createRange();
+            found_range.selectNodeContents(lines[i]);
+
+            DOMRectArray = Array.from(found_range.getClientRects())
+            num_of_rows = DOMRectArray.length / countEnd
+            console.log(DOMRectArray, num_of_rows)
+            if (DOMRectArray.slice(end, end + num_of_rows).some((rec) => rec.bottom.toFixed(3) === selected_pos.bottom.toFixed(3))){
+                 // reassign "end". Now "end" is no longer a loop variable but start position of selection
+                end = i
+                breakCheck = 1;
+                break;
+            }
+            else{
+                end = end + num_of_rows;
+            }
+        }
+    }
+
+    let lineArea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes
+    lineNumbers = lineArea[start].innerText + " - "+ lineArea[end].innerText
+    console.log(lineNumbers)
+    pre_content = textArray.slice(0, start - 1).join('\n')
+    selected_lines = textArray.slice(start - 1, end).join('\n')
+    pos_content = textArray.slice(end).join('\n')
+    console.log([textArray.slice(0, start - 1).join('\n')]);
+    console.log([textArray.slice(start - 1, end).join('\n')]);
+    console.log([textArray.slice(end).join('\n')]);
+    pre_content = pre_content.replace(reg1, '\\author{anonymous}');
+    pre_content = pre_content.replace(reg2, '\\affil{anonymous}');
+    pos_content = pos_content.replace(reg1, '\\author{anonymous}');
+    pos_content = pos_content.replace(reg2, '\\affil{anonymous}');
+    selected_lines = selected_lines.replace(reg1, '\\author{anonymous}');
+    selected_lines = selected_lines.replace(reg2, '\\affil{anonymous}');
+
+    tptop = selected_pos.y + selected_pos.height;
+    tpleft = selected_pos.x + selected_pos.width;
+    createTooltip();
+
+    chrome.runtime.sendMessage({editingFile: filename,message: "assist", pre_content: pre_content, pos_content: pos_content,
+    selected_text: selected_text, current_line_content: selected_lines, project_id: project_id, line: lineNumbers});
+}
 
 //remove tooltip
 function tooltipClick(event) {
@@ -344,131 +483,7 @@ function tooltipClick(event) {
 let excludedKeys = ["Meta", "Alt", "Tab","Shift","CapsLock","ArrowUp", "Control", "ArrowDown", "ArrowLeft","ArrowRight"];
 
 document.body.onkeyup = function (e) { // save every keystroke
-    if (e.key === 'F4') {
-        // get selected information such as html element, text, and position relative to viewers' screen
-        var selected_element = window.getSelection();
-        var selected_text = selected_element.toString();
-        var selected_range = selected_element.getRangeAt(0); //get the text range
-        var selected_pos = selected_range.getBoundingClientRect();
-
-        // get all the lines and number of lines
-        const cm_content = document.getElementsByClassName("cm-content cm-lineWrapping");
-        console.log(selected_text);
-        console.log("--------------------------------");
-        lines = cm_content[0].childNodes;
-        var length = lines.length;
-        console.log(length)
-        console.log(selected_range);
-
-        var startContainer = selected_range.startContainer
-        while(startContainer.className !== "cm-line"){
-            startContainer = startContainer.parentElement
-        }
-        var endContainer = selected_range.endContainer
-        while(endContainer.className !== "cm-line"){
-            endContainer = endContainer.parentElement
-        }
-        console.log(startContainer);
-        console.log(endContainer);
-        console.log("--------------------------------");
-        console.log(selected_pos);
-        var found_range = undefined;        // The range object of selected elements
-        var DOMRectArray = [];              // An DOMRect object array. DOMRect: the size and position of an element
-        var num_of_rows = 0;                // Number of rows of selected text in Latex editor
-        var i = 1;                          // loop variable
-        start = 0;                      // startContainer's position
-        end = 0;                        // endContainer's position
-        var skipCheck = 0;                  // Whether found the position of startContainer
-        var breakCheck = 0;                 // Whether found the Position of endContainer
-
-        // algorithm to get the selected line.
-        // This could help us get the context and feed into ChatGPT
-        var countStart = 0
-        var countEnd = 0
-        var textArray = []
-        for (; i<length; i++){
-            line = lines[i].innerText;
-            if (line !== '\n'){
-                textArray.push(line);
-            }
-            else{
-                textArray.push('');
-            }
-            if (line === startContainer.innerText){
-                countStart += 1
-            }
-            // the start and end text could be the same
-            if (line ===  endContainer.innerText){
-                countEnd += 1
-            }
-        }
-
-        console.log("countStart: ",countStart)
-        console.log("countEnd: ",countEnd)
-        for (i=1; i<length; i++){
-            line = lines[i].innerText;
-            console.log(line);
-            if (skipCheck == 0 && line === startContainer.innerText){
-                console.log("here");
-                found_range = lines[i].ownerDocument.createRange();
-                found_range.selectNodeContents(lines[i]);
-
-                DOMRectArray = Array.from(found_range.getClientRects())
-                num_of_rows = DOMRectArray.length / countEnd
-                if (DOMRectArray.slice(start, start + num_of_rows).some((rec) => rec.top.toFixed(3) === selected_pos.top.toFixed(3))){
-                    // reassign "start". Now "start" is no longer a loop variable but start position of selection
-                    start = i
-                    skipCheck = 1;
-                }
-                else{
-                    start = start + num_of_rows
-                }
-            }
-            if (skipCheck == 1 && line === endContainer.innerText){
-                console.log("here2");
-                found_range = lines[i].ownerDocument.createRange();
-                found_range.selectNodeContents(lines[i]);
-
-                DOMRectArray = Array.from(found_range.getClientRects())
-                num_of_rows = DOMRectArray.length / countEnd
-                console.log(DOMRectArray, num_of_rows)
-                if (DOMRectArray.slice(end, end + num_of_rows).some((rec) => rec.bottom.toFixed(3) === selected_pos.bottom.toFixed(3))){
-                     // reassign "end". Now "end" is no longer a loop variable but start position of selection
-                    end = i
-                    breakCheck = 1;
-                    break;
-                }
-                else{
-                    end = end + num_of_rows;
-                }
-            }
-        }
-
-        let lineArea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes
-        lineNumbers = lineArea[start].innerText + " - "+ lineArea[end].innerText
-        console.log(lineNumbers)
-        pre_content = textArray.slice(0, start - 1).join('\n')
-        selected_lines = textArray.slice(start - 1, end).join('\n')
-        pos_content = textArray.slice(end).join('\n')
-        console.log([textArray.slice(0, start - 1).join('\n')]);
-        console.log([textArray.slice(start - 1, end).join('\n')]);
-        console.log([textArray.slice(end).join('\n')]);
-        pre_content = pre_content.replace(reg1, '\\author{anonymous}');
-        pre_content = pre_content.replace(reg2, '\\affil{anonymous}');
-        pos_content = pos_content.replace(reg1, '\\author{anonymous}');
-        pos_content = pos_content.replace(reg2, '\\affil{anonymous}');
-        selected_lines = selected_lines.replace(reg1, '\\author{anonymous}');
-        selected_lines = selected_lines.replace(reg2, '\\affil{anonymous}');
-
-        tptop = selected_pos.y + selected_pos.height;
-        tpleft = selected_pos.x + selected_pos.width;
-        createTooltip();
-
-        chrome.runtime.sendMessage({editingFile: filename,message: "assist", pre_content: pre_content, pos_content: pos_content,
-        selected_text: selected_text, current_line_content: selected_lines, project_id: project_id, line: lineNumbers});
-
-     }
-    else if (!excludedKeys.includes(e.key)){
+    if (!excludedKeys.includes(e.key)){
         project_id = document.querySelector('meta[name="ol-project_id"]').content
         destroy();
         if (EXTENSION_TOGGLE) {

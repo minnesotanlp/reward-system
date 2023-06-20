@@ -46,11 +46,19 @@ chrome.runtime.onMessage.addListener(
             // tpcontent stands for tooltip content. It is ChatGPT generated.
             // diffs_html showing the difference between User's writing and ChatGPT's paraphrasing
             console.log("suggetion: ", tpcontent);
-            tooltip.textContent = tpcontent;
-            tooltip.innerHTML = request.diffs_html;
+            if (tpcontent == ""){
+                tooltip.textContent = "Sorry, a server error encountered.\nPlease try again later.";
+                sleep(3000).then(() => {
+                    tooltip.parentNode.removeChild(tooltip);
+                    tooltip = null;
+                })
+            }
+            else{
+                tooltip.innerHTML = request.diffs_html;
 
-            // when user click away, the tooltip disappear
-            document.addEventListener('click', tooltipClick);
+                // when user click away, the tooltip disappear
+                document.addEventListener('click', tooltipClick);
+            }
         }
         else{
             EXTENSION_TOGGLE = request.toggle
@@ -143,7 +151,7 @@ function getEditingText() { // find areas in current file that reader may be rea
     var k = 1
     var offset = 0
 
-    if (lines[1].nextElementSibling.matches('div[contenteditable="false"][style]')){
+    if (lines[1].nextElementSibling != null && lines[1].nextElementSibling.matches('div[contenteditable="false"][style]')){
         k = count
         offset = count - 1
         length = length + offset
@@ -176,11 +184,13 @@ function getEditingText() { // find areas in current file that reader may be rea
 
 // if user leave the current page, send Message to background.
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === 'hidden') {
-      if (EXTENSION_TOGGLE) {
-          chrome.runtime.sendMessage({message: "hidden", revisions: editingParagraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
-      }
-  }
+    setTimeout(() => {
+        if (document.visibilityState === 'hidden') {
+            if (EXTENSION_TOGGLE) {
+                chrome.runtime.sendMessage({message: "hidden", revisions: editingParagraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+            }
+        }
+    }, 0)
 });
 
 

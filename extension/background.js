@@ -39,7 +39,7 @@ chrome.runtime.onMessage.addListener(
                 postWriterText({state: "user_selection",timestamp: time, accept: true});
             }
         }
-        if (request.message == "assist"){
+        else if (request.message == "assist"){
             var d = new Date();
             var ms = d.getMilliseconds();
             var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
@@ -277,4 +277,5 @@ async function generateText() {
         chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.status, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html}, function (response) {
         });
     });
+    return true;
 }

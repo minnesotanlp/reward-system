@@ -116,9 +116,11 @@ class MainClass(Resource):
                 else:
                     send = suggestion
                     suggestion = "abc"
-                    diffs = dmp.diff_main(selected_text, send)
-                    dmp.diff_cleanupSemantic(diffs)
-                    diffs_html = dmp.diff_prettyHtml(diffs)
+                    diffs_html = ""
+                    if suggestion != "":
+                        diffs = dmp.diff_main(selected_text, send)
+                        dmp.diff_cleanupSemantic(diffs)
+                        diffs_html = dmp.diff_prettyHtml(diffs)
                     return {
                         "status": send,
                         "diffs_html": diffs_html,
@@ -581,8 +583,11 @@ class MainClass(Resource):
                 # Passing the context to the language model along with the selected content
                 before = info["pre_content"] + same_line_before
                 after = same_line_after + info["pos_content"]
-                suggestion = str(chat(before, after, selected_text, State([])).run())
-                suggTrack = suggestion
+                try:
+                    suggestion = str(chat(before, after, selected_text, State([])).run())
+                    suggTrack = suggestion
+                except:
+                    suggestion = ""
 
                 # setup all logging info
                 info["selected_text"] = selected_text
@@ -638,7 +643,7 @@ class MainClass(Resource):
                 info["copy"] = info.pop("cb")
 
             # add document to database
-            activity.insert_one(info)
+            # activity.insert_one(info)
             print(info)
 
             return {

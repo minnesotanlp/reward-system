@@ -48,6 +48,7 @@ chrome.runtime.onMessage.addListener(
             console.log("suggetion: ", tpcontent);
             if (tpcontent == ""){
                 tooltip.textContent = "Sorry, a server error encountered.\nPlease try again later.";
+                chrome.runtime.sendMessage({message: "user_selection", accept: false});
                 sleep(3000).then(() => {
                     tooltip.parentNode.removeChild(tooltip);
                     tooltip = null;

@@ -102,7 +102,7 @@ def get_collection():
 
 
 # create database instance
-db = get_collection()
+# db = get_collection()
 client = MongoClient('localhost', 27017)
 db = client.flask_db
 activity = db.activity

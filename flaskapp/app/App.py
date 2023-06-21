@@ -8,11 +8,14 @@ from dataclasses import dataclass, replace
 from minichain import OpenAI, prompt, show, transform, Mock
 import os
 import diff_match_patch as dmp_module
-import traceback
 dmp = dmp_module.diff_match_patch()
+import traceback
+from rich.console import Console
+console = Console()
 from pymongo import MongoClient
 
 import spacy
+
 sent_tokenizer = spacy.load("en_core_web_sm")
 
 application = Flask(__name__)
@@ -25,8 +28,8 @@ name_space = app.namespace('ReWARD', description='Record writing activity')
 
 model = app.model('Recording Writer Actions for Rhetorical Adjustment',
                   {'Reward': fields.String(required=True,
-                                         description="--",
-                                         help="--")})
+                                           description="--",
+                                           help="--")})
 # application.config["MONGO_URI"] = 'mongodb://' + os.environ['MONGODB_USERNAME'] + ':' + os.environ['MONGODB_PASSWORD'] + '@' + os.environ['MONGODB_HOSTNAME'] + ':27017/' + os.environ['MONGODB_DATABASE']
 # mongo = PyMongo(application)
 # db = mongo.db
@@ -38,7 +41,7 @@ suggestion = "abc"
 same_line_before = ""
 same_line_after = ""
 selected_text = ""
-
+suggestion_Log = ""
 
 @dataclass
 class State:
@@ -52,11 +55,13 @@ class State:
     def __str__(self):
         return self.memory[-1][-1]
 
+
 # Chat prompt with memory
 
 @prompt(OpenAI(), template_file="chat.pmpt.tpl")
 def chat_response(model, state: State) -> State:
     return model.stream(state)
+
 
 @transform()
 def update(state, chat_output):
@@ -69,7 +74,10 @@ def chat(before, after, current, state):
     state = replace(state, human_input=command)
     return update(state, chat_response(state))
 
+
 import pymongo
+
+
 # for using Azure CosmoDB
 def get_collection():
     # Get connection info from environment variables
@@ -92,15 +100,18 @@ def get_collection():
     db = client[DB_NAME]
     return db[COLLECTION_NAME]
 
+
 # create database instance
-# db = get_collection()
+db = get_collection()
 client = MongoClient('localhost', 27017)
 db = client.flask_db
 activity = db.activity
 
+
 @name_space.route("/activity")
 class MainClass(Resource):
     check = 0
+
     @app.doc(responses={200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error'},
              params={'activity': 'data from most recent writing activity',
                      'timestamp': 'The time at which writer action was recorded'})
@@ -109,24 +120,9 @@ class MainClass(Resource):
             summary = "retrieving the writing actions real time from user input into the overleaf editor"
             # resp_json = request.get_data()
             # print(resp_json)
-            global suggestion
-            while (True):
-                if (suggestion == "abc"):
-                    time.sleep(0.1)
-                else:
-                    send = suggestion
-                    suggestion = "abc"
-                    diffs_html = ""
-                    if suggestion != "":
-                        diffs = dmp.diff_main(selected_text, send)
-                        dmp.diff_cleanupSemantic(diffs)
-                        diffs_html = dmp.diff_prettyHtml(diffs)
-                    return {
-                        "status": send,
-                        "diffs_html": diffs_html,
-                        "same_line_before": same_line_before,
-                        "same_line_after": same_line_after
-                    }
+            return {
+                "state": summary
+            }
 
         except KeyError as e:
             name_space.abort(500, e.__doc__, status="Could not retrieve information", statusCode="500")
@@ -137,7 +133,6 @@ class MainClass(Resource):
              params={'activity': 'data from most recent writing activity',
                      'timestamp': 'The time at which writer action was recorded'})
     @app.expect(model)
-
     def exist_and_not_skip(self, i, text, skip):
         try:
             if (text[i][0]) != skip:
@@ -543,20 +538,16 @@ class MainClass(Resource):
 
     def post(self):
         try:
-            global suggestion, same_line_before, same_line_after, selected_text, suggTrack
+            global suggestion, same_line_before, same_line_after, selected_text, suggestion_Log
             info = request.get_json(force=True)
-            print(info)
             state = info['state']
+            console.log(info)
             try:
                 onkey = info['onkey']
             except:
                 onkey = ""
-            if state == "user_selection":
-                if info["accept"]:
-                    info["changes"] = selected_text+"->"+suggTrack
-                else:
-                    info["changes"] = "All lines are the same"
-            elif state == "assist":
+            if state == "assist":
+                # find where the selection begin
                 dmp.Match_Distance = 5000
                 start = dmp.match_main(info["current_content"], info["selected_text"], 0)
                 end = start + len(info["selected_text"]) - 1
@@ -564,7 +555,7 @@ class MainClass(Resource):
                 # if selected text is not a complete sentence
                 for j in range(end, len(info["current_content"]), 1):
                     if info["current_content"][j] in ".?!;\n":
-                        end = j+1
+                        end = j + 1
                         break
                     end += 1
                 for i in range(start, 0, -1):
@@ -585,7 +576,6 @@ class MainClass(Resource):
                 after = same_line_after + info["pos_content"]
                 try:
                     suggestion = str(chat(before, after, selected_text, State([])).run())
-                    suggTrack = suggestion
                 except:
                     suggestion = ""
 
@@ -597,6 +587,37 @@ class MainClass(Resource):
                 info.pop("pre_content")
                 info.pop("pos_content")
                 info.pop("current_content")
+
+                # send ChatGPT's paraphrase to the frontend
+                suggestion_Log = suggestion
+                suggestion = "abc"
+                diffs_html = ""
+                if suggestion_Log != "":
+                    diffs = dmp.diff_main(selected_text, suggestion_Log)
+                    dmp.diff_cleanupSemantic(diffs)
+                    diffs_html = dmp.diff_prettyHtml(diffs)
+
+                activity.insert_one(info)
+                console.log(info)
+                return {
+                    "status": "ChatGPT",
+                    "suggestion": suggestion_Log,
+                    "diffs_html": diffs_html,
+                    "same_line_before": same_line_before,
+                    "same_line_after": same_line_after
+                }
+
+            elif state == "user_selection":
+                if info["accept"]:
+                    info["changes"] = selected_text + "->" + suggestion_Log
+                else:
+                    info["changes"] = "All lines are the same"
+
+                activity.insert_one(info)
+                console.log(info)
+                return {
+                    "status": "Updated recent writing actions in doc",
+                }
             elif state == 2:
                 info = self.copyHandler(info)
             elif (onkey in "zZyY" and len(info['revision']) >= 4) or state == 3:
@@ -625,26 +646,31 @@ class MainClass(Resource):
                 if change != "All lines are the same":
                     charNum = self.pasteCountChar(info["text"], info["revision"])
                     lineNum = info['line']
-                    info["changes"] = '(' + str(lineNum) + ',' + str(charNum) + ')' + change
+                    info["changes"] = ['(' + str(lineNum) + ',' + str(charNum) + ') ' + change]
                 else:
                     info["changes"] = "All lines are the same"
             else:
                 changes = self.typeHandler(info)
                 info["changes"] = changes
 
+            info.pop('onkey')
+            info.pop('line')
             if state == 0 or state == 4:
-                info.pop('line')
-                info.pop("cb")
+                info['state'] = "Type"
+                info.pop('cb')
             elif state == 1:
-                info.pop('line')
-                info["cut"] = info.pop("cb")
+                info['state'] = "Cut"
+                info['clipboard'] = info.pop('cb')
             elif state == 2:
+                info['state'] = "Copy"
                 info.pop('copyLineNumbers')
-                info["copy"] = info.pop("cb")
-
+                info['clipboard'] = info.pop('cb')
+            elif state == 3:
+                info['state'] = "Paste"
+                info['clipboard'] = info.pop('cb')
             # add document to database
-            # activity.insert_one(info)
-            print(info)
+            activity.insert_one(info)
+            console.log(info)
 
             return {
                 "status": "Updated recent writing actions in doc",
@@ -654,6 +680,7 @@ class MainClass(Resource):
         except Exception as e:
             print(traceback.print_exc())
             name_space.abort(400, e.__doc__, status="Could not save information", statusCode="400")
+
 
 if __name__ == "__main__":
     ENVIRONMENT_DEBUG = os.environ.get("APP_DEBUG", True)

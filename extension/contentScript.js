@@ -27,7 +27,7 @@ let end = 0;
 let same_line_before = ""
 let same_line_after = ""
 
-let EXTENSION_TOGGLE = true
+let EXTENSION_TOGGLE = false
 let tpcontent = "Hello, This is a tooltip!"
 
 chrome.runtime.onMessage.addListener(
@@ -47,16 +47,11 @@ chrome.runtime.onMessage.addListener(
             // diffs_html showing the difference between User's writing and ChatGPT's paraphrasing
             console.log("suggetion: ", tpcontent);
             if (tpcontent == ""){
-                tooltip.textContent = "Sorry, a server error encountered.\nPlease try again later.";
-                chrome.runtime.sendMessage({message: "user_selection", accept: false});
-                sleep(3000).then(() => {
-                    tooltip.parentNode.removeChild(tooltip);
-                    tooltip = null;
-                })
+                tooltip.textContent = "Sorry, a server error encountered. Please try again later.";
+                document.addEventListener('click', tooltipClickRemove);
             }
             else{
                 tooltip.innerHTML = request.diffs_html;
-
                 // when user click away, the tooltip disappear
                 document.addEventListener('click', tooltipClick);
             }
@@ -73,7 +68,7 @@ chrome.runtime.onMessage.addListener(
                 console.log("CONTENT OFF");
             }
         }
-        return true;
+         sendResponse({message: true});
     }
 );
 
@@ -188,7 +183,7 @@ document.addEventListener("visibilitychange", () => {
     setTimeout(() => {
         if (document.visibilityState === 'hidden') {
             if (EXTENSION_TOGGLE) {
-                chrome.runtime.sendMessage({message: "hidden", revisions: editingParagraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+                chrome.runtime.sendMessage({message: "hidden", revisions: editingParagraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, onkey: ""});
             }
         }
     }, 0)
@@ -200,7 +195,7 @@ const scrollPost = (mutations) =>{
     console.log("***** scroll *****")
     getEditingText();
     if (EXTENSION_TOGGLE) {
-        chrome.runtime.sendMessage({editingFile: filename, message: "scroll", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+        chrome.runtime.sendMessage({editingFile: filename, message: "scroll", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, onkey: ""});
     }
     paragraph = editingParagraph;
     paragraphArray = editingArray;
@@ -229,7 +224,7 @@ async function filePost(){
     getEditingText();
     console.log(editingParagraph);
     if (EXTENSION_TOGGLE) {
-        chrome.runtime.sendMessage({editingFile: filename, message: "switch", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+        chrome.runtime.sendMessage({editingFile: filename, message: "switch", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, onkey: ""});
     }
     filename = f;
     paragraph = editingParagraph;
@@ -343,7 +338,7 @@ function AI_Paraphrase(){
     console.log("--------------------------------");
     lines = cm_content[0].childNodes;
     var length = lines.length;
-    console.log(length)
+    console.log(length);
     console.log(selected_range);
 
     var startContainer = selected_range.startContainer
@@ -429,7 +424,8 @@ function AI_Paraphrase(){
             }
         }
     }
-
+    console.log(start)
+    console.log(end)
     let lineArea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes
     lineNumbers = lineArea[start].innerText + " - "+ lineArea[end].innerText
     console.log(lineNumbers)
@@ -454,7 +450,15 @@ function AI_Paraphrase(){
     selected_text: selected_text, current_line_content: selected_lines, project_id: project_id, line: lineNumbers});
 }
 
-//remove tooltip
+// The tooltip disappears no matter where the user clicks
+function tooltipClickRemove(){
+    tooltip.parentNode.removeChild(tooltip);
+    tooltip = null;
+    document.removeEventListener('click', tooltipClick);
+    chrome.runtime.sendMessage({message: "user_selection", accept: false});
+}
+
+//Replace text if user click inside the tooltip; remove the tooltip if user clicks outside it
 function tooltipClick(event) {
   if (tooltip && !tooltip.contains(event.target)) {
     tooltip.parentNode.removeChild(tooltip);
@@ -487,7 +491,7 @@ function tooltipClick(event) {
     paragraphArray = editingArray;
     paragraphLines = editingLines;
     document.removeEventListener('click', tooltipClick);
-    chrome.runtime.sendMessage({message: "user_selection", accept: true});
+    chrome.runtime.sendMessage({message: "user_selection", accept: true, revisions: editingParagraph});
   }
 }
 
@@ -530,7 +534,7 @@ function checkUndoOrRevert(element, event) {
     console.log("Undo or revert event detected");
     getEditingText();
     if (EXTENSION_TOGGLE) {
-        chrome.runtime.sendMessage({editingFile: filename, message: "undo", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray});
+        chrome.runtime.sendMessage({editingFile: filename, message: "undo", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, onkey: "z"});
     }
     paragraph = editingParagraph;
     paragraphArray = editingArray;

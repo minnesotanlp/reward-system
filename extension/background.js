@@ -1,7 +1,7 @@
 let serverURL;
 // serverURL = "http://127.0.0.1:5000/"
 // serverURL = "http://localhost"
-serverURL = "https://95d8-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app/";
+serverURL = "https://cb5c-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app";
 let headers = new Headers();
 headers.append('GET', 'POST', 'OPTIONS');
 headers.append('Access-Control-Allow-Origin', 'http://127.0.0.1:5000/');
@@ -37,6 +37,7 @@ chrome.runtime.onMessage.addListener(
             }
             else{
                 postWriterText({state: "user_selection",timestamp: time, accept: true});
+                text = [request.revisions];
             }
         }
         else if (request.message == "assist"){
@@ -46,7 +47,6 @@ chrome.runtime.onMessage.addListener(
             postWriterText({state: "assist",timestamp: time, project: projectID, file: filename, pre_content: request.pre_content,
             pos_content: request.pos_content, selected_text: request.selected_text, current_content: request.current_line_content,
             line: request.line});
-            generateText();
         }
         else{
             console.log(request)
@@ -135,6 +135,7 @@ chrome.runtime.onMessage.addListener(
            trackWriterAction(3, request.text, request.revisions, lineNumber);
            text = [request.revisions];
         }
+         sendResponse({message: true});
     }
 );
 
@@ -217,7 +218,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
         else if(diff[1][0] === -1) {
             change = "deletion";
 
-            if ((diff[1][1].includes('\n') || diff[1][1].includes(' '))|| state != 0){
+            if ((diff[1][1].includes('\n') || diff[1][1].includes(' '))|| state != 0 || diff.length > 3){
                // if user delete a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
                 postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
@@ -227,7 +228,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
         }
         else if (diff[1][0] === 1){
             change = "addition";
-            if ((diff[1][1].includes('\n') || diff[1][1].includes(' ')) || state != 0){
+            if ((diff[1][1].includes('\n') || diff[1][1].includes(' ')) || state != 0 || diff.length > 3){
                 // if user add a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
                 postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
@@ -241,7 +242,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
 
 async function postWriterText(activity) {
     console.log(activity);
-    await fetch(serverURL + "/ReWARD/activity", {
+    const response = await fetch(serverURL + "/ReWARD/activity", {
             mode: 'no-cors',
             headers: {
                 'Accept': 'application/json',
@@ -249,33 +250,38 @@ async function postWriterText(activity) {
             },
             method: 'POST',
             body: JSON.stringify(activity),
-        }, async function (err, resp, body) {
-            const message = await resp.json();
-            console.log(message);
-            if (err) {
-                console.log('Could not post writer actions.');
-                console.log(err);
-            }
+        })
+        const message = await response.json();
+        console.log(message);
+        if (response.ok && message.status == "ChatGPT"){
+            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+                chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.suggestion, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html}, function (response) {
+                });
+            });
         }
-    );
+        else if (!response.ok) {
+            console.log('Could not post writer actions.');
+        }
 }
 
-async function generateText() {
-    console.log("from main.py:");
-    const response = await fetch(serverURL + "/ReWARD/activity", {
-        mode: 'no-cors',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        method: 'GET',
-    });
-    console.log("from main.py:");
-    const message = await response.json();
-    console.log("from main.py:",message.status);
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.status, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html}, function (response) {
-        });
-    });
-    return true;
-}
+//async function generateText(activity) {
+//    console.log(activity);
+//    const response = await fetch(serverURL + "/ReWARD/activity", {
+//        mode: 'no-cors',
+//        headers: {
+//            'Accept': 'application/json',
+//            'Content-Type': 'application/json'
+//        },
+//        method: 'GET',
+//        body: JSON.stringify(activity),
+//    }, async function (err, resp, body) {
+//        console.log("from main.py:");
+//        const message = await resp.json();
+//        console.log("from main.py:",message.status);
+//        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+//            chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.status, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html}, function (response) {
+//            });
+//        });
+//    });
+//    return true;
+//}

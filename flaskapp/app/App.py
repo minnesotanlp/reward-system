@@ -599,13 +599,19 @@ class MainClass(Resource):
 
                 activity.insert_one(info)
                 console.log(info)
-                return {
+                data = {
                     "status": "ChatGPT",
                     "suggestion": suggestion_Log,
                     "diffs_html": diffs_html,
                     "same_line_before": same_line_before,
                     "same_line_after": same_line_after
                 }
+                response = jsonify(data)
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                return response
 
             elif state == "user_selection":
                 if info["accept"]:
@@ -613,11 +619,15 @@ class MainClass(Resource):
                 else:
                     info["changes"] = "All lines are the same"
 
-                activity.insert_one(info)
+                # activity.insert_one(info)
                 console.log(info)
-                return {
-                    "status": "Updated recent writing actions in doc",
-                }
+                response = jsonify({"status": "Updated recent writing actions in doc"})
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                return response
+
             elif state == 2:
                 info = self.copyHandler(info)
             elif (onkey in "zZyY" and len(info['revision']) >= 4) or state == 3:
@@ -672,15 +682,26 @@ class MainClass(Resource):
             activity.insert_one(info)
             console.log(info)
 
-            return {
-                "status": "Updated recent writing actions in doc",
-            }
+            response = jsonify({"status": "Updated recent writing actions in doc"})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
+            response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+            return response
+
         except KeyError as e:
             name_space.abort(500, e.__doc__, status="Could not save information", statusCode="500")
         except Exception as e:
             print(traceback.print_exc())
             name_space.abort(400, e.__doc__, status="Could not save information", statusCode="400")
 
+    def options(self):
+        response = jsonify({'message': 'OK'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        return response
 
 if __name__ == "__main__":
     ENVIRONMENT_DEBUG = os.environ.get("APP_DEBUG", True)

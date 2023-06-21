@@ -1,7 +1,7 @@
 let serverURL;
 // serverURL = "http://127.0.0.1:5000/"
 // serverURL = "http://localhost"
-serverURL = "https://cb5c-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app";
+serverURL =  "";
 let headers = new Headers();
 headers.append('GET', 'POST', 'OPTIONS');
 headers.append('Access-Control-Allow-Origin', 'http://127.0.0.1:5000/');
@@ -243,7 +243,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
 async function postWriterText(activity) {
     console.log(activity);
     const response = await fetch(serverURL + "/ReWARD/activity", {
-            mode: 'no-cors',
+            // mode: 'no-cors',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'

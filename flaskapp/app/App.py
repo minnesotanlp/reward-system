@@ -619,7 +619,7 @@ class MainClass(Resource):
                 else:
                     info["changes"] = "All lines are the same"
 
-                # activity.insert_one(info)
+                activity.insert_one(info)
                 console.log(info)
                 response = jsonify({"status": "Updated recent writing actions in doc"})
                 response.headers.add('Access-Control-Allow-Origin', '*')

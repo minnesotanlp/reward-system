@@ -1,7 +1,7 @@
 let serverURL;
-// serverURL = "http://127.0.0.1:5000/"
+serverURL = "http://127.0.0.1:5000/"
 // serverURL = "http://localhost"
-serverURL =  "https://aad1-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app";
+// serverURL =  "https://aad1-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app";
 let headers = new Headers();
 headers.append('GET', 'POST', 'OPTIONS');
 headers.append('Access-Control-Allow-Origin', 'http://127.0.0.1:5000/');
@@ -20,6 +20,13 @@ let copyLineNumbers;
 let projectID = "no url"
 let suggestion = ""
 let onkey = ""
+let username = ""
+
+chrome.storage.local.get(['username'], function(result) {
+    if (result.username !== undefined){
+        username = result.username;
+    }
+});
 
 chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
@@ -33,10 +40,10 @@ chrome.runtime.onMessage.addListener(
             var ms = d.getMilliseconds();
             var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
             if (request.accept == false){
-                postWriterText({state: "user_selection",timestamp: time, accept: false});
+                postWriterText({state: "user_selection", username: username, timestamp: time, accept: false});
             }
             else{
-                postWriterText({state: "user_selection",timestamp: time, accept: true});
+                postWriterText({state: "user_selection", username: username, timestamp: time, accept: true});
                 text = [request.revisions];
             }
         }
@@ -44,9 +51,13 @@ chrome.runtime.onMessage.addListener(
             var d = new Date();
             var ms = d.getMilliseconds();
             var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
-            postWriterText({state: "assist",timestamp: time, project: projectID, file: filename, pre_content: request.pre_content,
+            postWriterText({state: "assist", username: username, timestamp: time, project: projectID, file: filename, pre_content: request.pre_content,
             pos_content: request.pos_content, selected_text: request.selected_text, current_content: request.current_line_content,
             line: request.line});
+        }
+        else if (request.message == "login"){
+            postWriterText({state: "login", username: request.username, password: request.password});
+            username = request.username;
         }
         else{
             console.log(request)
@@ -185,7 +196,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
     var ms = d.getMilliseconds();
     var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,)
     if (state == 3){
-        postWriterText({timestamp: time, project: projectID, file: filename, text: writerText, revision: revisions,
+        postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: writerText, revision: revisions,
         state: state, cb: clipboard, line: ln, onkey: onkey})
         text = [revisions]
         clipboard = "";
@@ -193,14 +204,14 @@ function trackWriterAction(state, writerText, revisions, ln) {
     else if (diff[0][0] === -1) {
             change = "deletion";
             changemade = difference(text[0], revisions)
-            postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
+            postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
              state: state, cb: clipboard, line: ln, onkey: onkey})
             text = [revisions]
     }
     else if (diff[0][1] === '\n' || diff[0][1] === ' ') {
         change = "addition";
         changemade = difference(text[0], revisions)
-        postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
+        postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
          state: state, cb: clipboard, line: ln, onkey: onkey})
         text = [revisions]
     }
@@ -210,7 +221,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
     else {
         if (state == 1 || state == 2) {
             change = "cut/copy";
-            postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: diff,
+            postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: diff,
             state: state, cb: clipboard, line: ln, copyLineNumbers:copyLineNumbers, onkey: onkey})
             text = [revisions]
             clipboard = "";
@@ -221,7 +232,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
             if ((diff[1][1].includes('\n') || diff[1][1].includes(' '))|| state != 0 || diff.length > 3){
                // if user delete a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
-                postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
+                postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
                 state: state, cb: clipboard, line: ln, onkey: onkey})
                 text = [revisions]
             }
@@ -231,7 +242,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
             if ((diff[1][1].includes('\n') || diff[1][1].includes(' ')) || state != 0 || diff.length > 3){
                 // if user add a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
-                postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
+                postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
                 state: state, cb: clipboard, line: ln, onkey:onkey})
                 text = [revisions]
             }
@@ -259,6 +270,12 @@ async function postWriterText(activity) {
                 });
             });
         }
+//        else if (response.ok && message.status == "authz"){
+//             chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+//                chrome.tabs.sendMessage(tabs[0].id, {source: "authz", type: request.type}, function (response) {
+//                });
+//            });
+//        }
         else if (!response.ok) {
             console.log('Could not post writer actions.');
         }

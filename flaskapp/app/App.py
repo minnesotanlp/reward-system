@@ -42,6 +42,7 @@ same_line_before = ""
 same_line_after = ""
 selected_text = ""
 suggestion_Log = ""
+user_list = {}
 
 @dataclass
 class State:
@@ -541,12 +542,40 @@ class MainClass(Resource):
             global suggestion, same_line_before, same_line_after, selected_text, suggestion_Log
             info = request.get_json(force=True)
             state = info['state']
-            console.log(info)
             try:
                 onkey = info['onkey']
             except:
                 onkey = ""
-            if state == "assist":
+            if state == "login":
+                try:
+                    if user_list[info['username']] == info['password']:
+                        data = {
+                            "status": "authz",
+                            "password": "true"
+                        }
+                        info["password"] = "true"
+                    else:
+                        data = {
+                            "status": "authz",
+                            "password": "false"
+                        }
+                        info["password"] = "wrong"
+                except:
+                    user_list[info['username']] = info['password']
+                    data = {
+                        "status": "authz",
+                        "password": "new"
+                    }
+                    info["password"] = "new_user"
+                activity.insert_one(info)
+                response = jsonify(data)
+                console.log(data)
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                return response
+            elif state == "assist":
                 # find where the selection begin
                 dmp.Match_Distance = 5000
                 start = dmp.match_main(info["current_content"], info["selected_text"], 0)

@@ -32,6 +32,22 @@ let tpcontent = "Hello, This is a tooltip!"
 
 chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
+//        if (request.source == "authz"){
+//            if (request.type == "new"){
+//                type = "new";
+//            }
+//            else if (request.type == "true"){
+//                type = "true";
+//            }
+//            else {
+//                username = "";
+//                type = "false";
+//            }
+//            chrome.runtime.sendMessage({target: "popup", type: type}, function(response) {
+//                // Handle any response received from the popup.js script
+//                console.log("Response from popup.js:", response);
+//            });
+//        }
         if (request.source == "chatgpt"){
             tpcontent = request.suggestion;
             same_line_before = request.same_line_before
@@ -55,6 +71,10 @@ chrome.runtime.onMessage.addListener(
                 // when user click away, the tooltip disappear
                 document.addEventListener('click', tooltipClick);
             }
+        }
+        else if (request.message == "login"){
+            username = request.username
+            chrome.runtime.sendMessage({editingFile: filename, message: "login", username: request.username, password: request.password});
         }
         else{
             EXTENSION_TOGGLE = request.toggle

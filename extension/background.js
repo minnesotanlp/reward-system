@@ -55,10 +55,6 @@ chrome.runtime.onMessage.addListener(
             pos_content: request.pos_content, selected_text: request.selected_text, current_content: request.current_line_content,
             line: request.line});
         }
-        else if (request.message == "login"){
-            postWriterText({state: "login", username: request.username, password: request.password});
-            username = request.username;
-        }
         else{
             console.log(request)
             lineNumber = findLineEdit(request.editingLines, request.editingArray, request.paragraphLines, request.paragraphArray);
@@ -253,7 +249,8 @@ function trackWriterAction(state, writerText, revisions, ln) {
 
 async function postWriterText(activity) {
     console.log(activity);
-    const response = await fetch(serverURL + "/ReWARD/activity", {
+    try {
+        const response = await fetch(serverURL + "/ReWARD/activity", {
             // mode: 'no-cors',
             headers: {
                 'Accept': 'application/json',
@@ -266,19 +263,14 @@ async function postWriterText(activity) {
         console.log(message);
         if (response.ok && message.status == "ChatGPT"){
             chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-                chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.suggestion, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html}, function (response) {
+                chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.suggestion, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html, explanation: message.explanation}, function (response) {
                 });
             });
         }
-//        else if (response.ok && message.status == "authz"){
-//             chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-//                chrome.tabs.sendMessage(tabs[0].id, {source: "authz", type: request.type}, function (response) {
-//                });
-//            });
-//        }
-        else if (!response.ok) {
-            console.log('Could not post writer actions.');
-        }
+    }
+    catch (err){
+        console.log('failed to fetch');
+    }
 }
 
 //async function generateText(activity) {

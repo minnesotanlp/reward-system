@@ -28,48 +28,48 @@ let same_line_before = ""
 let same_line_after = ""
 
 let EXTENSION_TOGGLE = false
-let tpcontent = "Hello, This is a tooltip!"
+let paraphrase = "Hello, This is a tooltip!"
 
+let timeout;
 chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
-//        if (request.source == "authz"){
-//            if (request.type == "new"){
-//                type = "new";
-//            }
-//            else if (request.type == "true"){
-//                type = "true";
-//            }
-//            else {
-//                username = "";
-//                type = "false";
-//            }
-//            chrome.runtime.sendMessage({target: "popup", type: type}, function(response) {
-//                // Handle any response received from the popup.js script
-//                console.log("Response from popup.js:", response);
-//            });
-//        }
         if (request.source == "chatgpt"){
-            tpcontent = request.suggestion;
-            same_line_before = request.same_line_before
-            same_line_after = request.same_line_after
-
-            // remove loader and corresponding style
-            var divToRemove = tooltip.getElementsByClassName('loader');
-            var styleToRemove = tooltip.querySelector('style');
-            tooltip.removeChild(divToRemove[0]);
-            styleToRemove.innerHTML = '';
+            clearTimeout(timeout);
+            console.log(request)
+            paraphrase = request.suggestion;
+            same_line_before = request.same_line_before;
+            same_line_after = request.same_line_after;
 
             // tpcontent stands for tooltip content. It is ChatGPT generated.
             // diffs_html showing the difference between User's writing and ChatGPT's paraphrasing
-            console.log("suggetion: ", tpcontent);
-            if (tpcontent == ""){
+            if (paraphrase == ""){
+                var divToRemove = tooltip.getElementsByClassName('loader');
+                var styleToRemove = tooltip.querySelector('style');
+                tooltip.removeChild(divToRemove[0]);
+                styleToRemove.innerHTML = '';
                 tooltip.textContent = "Sorry, a server error encountered. Please try again later.";
                 document.addEventListener('click', tooltipClickRemove);
             }
             else{
-                tooltip.innerHTML = request.diffs_html;
-                // when user click away, the tooltip disappear
-                document.addEventListener('click', tooltipClick);
+                tooltip.parentNode.removeChild(tooltip);
+                tooltip = null;
+                document.removeEventListener('click', tooltipClick);
+                var rightPanel = document.querySelector(".ui-layout-east.ui-layout-pane.ui-layout-pane-east")
+                var extensionURL = chrome.runtime.getURL('tooltip.html');
+                var time = (new Date()).toString().slice(0,21);
+                tooltip = document.createElement('aside')
+                tooltip.className = "Chat"
+                fetch(extensionURL)
+                    .then(response => response.text())
+                    .then(htmlContent => {
+                        tooltip.innerHTML = htmlContent;
+                        tooltip.querySelector('.date').textContent = time;
+                        tooltip.querySelectorAll('.message-content')[0].innerHTML = request.diffs_html;
+                        tooltip.querySelectorAll('.message-content')[1].textContent = request.explanation;;
+                        rightPanel.appendChild(tooltip);
+                        tooltip.querySelector('.accept-button').addEventListener('click', tooltipClick);
+                        tooltip.querySelector('.reject-button').addEventListener('click', tooltipClick);
+                    })
             }
         }
         else if (request.message == "login"){
@@ -468,32 +468,41 @@ function AI_Paraphrase(){
 
     chrome.runtime.sendMessage({editingFile: filename,message: "assist", pre_content: pre_content, pos_content: pos_content,
     selected_text: selected_text, current_line_content: selected_lines, project_id: project_id, line: lineNumbers});
+
+    timeout = setTimeout(function() {
+        var divToRemove = tooltip.getElementsByClassName('loader');
+        var styleToRemove = tooltip.querySelector('style');
+        tooltip.removeChild(divToRemove[0]);
+        styleToRemove.innerHTML = '';
+        tooltip.textContent = "Sorry, a server error encountered. Please try again later.";
+        document.addEventListener('click', tooltipClickRemove);
+    }, 10000);
 }
 
 // The tooltip disappears no matter where the user clicks
 function tooltipClickRemove(){
     tooltip.parentNode.removeChild(tooltip);
     tooltip = null;
-    document.removeEventListener('click', tooltipClick);
+    document.removeEventListener('click', tooltipClickRemove);
     chrome.runtime.sendMessage({message: "user_selection", accept: false});
 }
 
 //Replace text if user click inside the tooltip; remove the tooltip if user clicks outside it
 function tooltipClick(event) {
-  if (tooltip && !tooltip.contains(event.target)) {
+  if (event.target === tooltip.querySelector('.reject-button')) {
+    tooltip.removeEventListener('click', tooltipClick);
     tooltip.parentNode.removeChild(tooltip);
     tooltip = null;
-    document.removeEventListener('click', tooltipClick);
     chrome.runtime.sendMessage({message: "user_selection", accept: false});
   }
-  else if (tooltip && tooltip.contains(event.target)){
+  else if (event.target === tooltip.querySelector('.accept-button')){
     console.log("1: ",same_line_before);
-    console.log("2: ",tpcontent);
+    console.log("2: ",paraphrase);
     console.log("3: ",same_line_after);
     var startIndex;
     var endIndex;
     var substring;
-    var string = same_line_before + tpcontent + same_line_after;
+    var string = same_line_before + paraphrase + same_line_after;
     var num_of_replace_line = end - start + 1
     // Calculate the desired length of each substring
     var substringLength = Math.ceil(string.length / num_of_replace_line);

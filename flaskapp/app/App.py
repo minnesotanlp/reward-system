@@ -34,14 +34,14 @@ model = app.model('Recording Writer Actions for Rhetorical Adjustment',
 # mongo = PyMongo(application)
 # db = mongo.db
 
-os.environ["OPENAI_API_KEY"] = ""
+os.environ["OPENAI_API_KEY"] = "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"
 warnings.filterwarnings("ignore")
 MEMORY = 0
 suggestion = "abc"
 same_line_before = ""
 same_line_after = ""
 selected_text = ""
-suggestion_Log = ""
+paraphrase = ""
 user_list = {}
 
 @dataclass
@@ -70,8 +70,16 @@ def update(state, chat_output):
     return state.push(result)
 
 
-def chat(before, after, current, state):
-    command = "This is what comes before: \"" + before + "\". Here is what comes after: \"" + after + "\". Please paraphrase this sentence/paragraph: \"" + current + "\". The length of sentence should not be too long or too short than previous one."
+def chat(current, state):
+    command = "Please paraphrase this sentence/paragraph. Then tell me benefits of paraphrasing in this way along with " \
+              "methods you use with examples from paraphrased paragraph: \n\"" + current + "\n\"."\
+              "\nThe length of sentence should not be too long or too short than previous one." \
+              "Feel Free to use any methods that are appropriate for scholarly writing, "\
+              "but total number of methods using should not be more than four. \n"\
+              "Your response format should be looks like this: \n"\
+              "Paraphrase: [Paraphrased paragraph]\n" \
+               "---------------------------------------------------------\n" \
+               "Explanation: [Explanation of the paraphrase]"
     state = replace(state, human_input=command)
     return update(state, chat_response(state))
 
@@ -539,7 +547,7 @@ class MainClass(Resource):
 
     def post(self):
         try:
-            global suggestion, same_line_before, same_line_after, selected_text, suggestion_Log
+            global suggestion, same_line_before, same_line_after, selected_text, paraphrase
             info = request.get_json(force=True)
             state = info['state']
             try:
@@ -604,33 +612,36 @@ class MainClass(Resource):
                 before = info["pre_content"] + same_line_before
                 after = same_line_after + info["pos_content"]
                 try:
-                    suggestion = str(chat(before, after, selected_text, State([])).run())
+                    suggestion = str(chat(selected_text, State([])).run())
+                    separator = "---------------------------------------------------------"
+                    split_response = suggestion.split(separator)
+                    if len(split_response) < 2:
+                        return None, None
+                    paraphrase = split_response[0].replace("Paraphrase:", "", 1).strip()
+                    explanation = split_response[1].replace("Explanation:", "", 1).strip()
                 except:
-                    suggestion = ""
-
+                    paraphrase = ""
+                    explanation = ""
                 # setup all logging info
                 info["selected_text"] = selected_text
                 info["context above"] = before
                 info["context below"] = after
-                info["suggestion"] = suggestion
+                info["suggestion"] = paraphrase
                 info.pop("pre_content")
                 info.pop("pos_content")
                 info.pop("current_content")
 
-                # send ChatGPT's paraphrase to the frontend
-                suggestion_Log = suggestion
-                suggestion = "abc"
                 diffs_html = ""
-                if suggestion_Log != "":
-                    diffs = dmp.diff_main(selected_text, suggestion_Log)
+                if paraphrase != "":
+                    diffs = dmp.diff_main(selected_text, paraphrase)
                     dmp.diff_cleanupSemantic(diffs)
                     diffs_html = dmp.diff_prettyHtml(diffs)
 
-                activity.insert_one(info)
                 console.log(info)
                 data = {
                     "status": "ChatGPT",
-                    "suggestion": suggestion_Log,
+                    "suggestion": paraphrase,
+                    "explanation": explanation,
                     "diffs_html": diffs_html,
                     "same_line_before": same_line_before,
                     "same_line_after": same_line_after
@@ -644,7 +655,7 @@ class MainClass(Resource):
 
             elif state == "user_selection":
                 if info["accept"]:
-                    info["changes"] = selected_text + "->" + suggestion_Log
+                    info["changes"] = selected_text + "->" + paraphrase
                 else:
                     info["changes"] = "All lines are the same"
 

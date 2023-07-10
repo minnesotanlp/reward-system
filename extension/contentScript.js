@@ -72,9 +72,11 @@ chrome.runtime.onMessage.addListener(
                     })
             }
         }
-        else if (request.message == "login"){
-            username = request.username
-            chrome.runtime.sendMessage({editingFile: filename, message: "login", username: request.username, password: request.password});
+        else if (request.message == "username"){
+            chrome.runtime.sendMessage({message: "username", username: request.username});
+        }
+        else if (request.message == "logout"){
+            chrome.runtime.sendMessage({message: "logout"});
         }
         else{
             EXTENSION_TOGGLE = request.toggle

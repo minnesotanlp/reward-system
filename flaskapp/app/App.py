@@ -42,7 +42,7 @@ same_line_before = ""
 same_line_after = ""
 selected_text = ""
 paraphrase = ""
-user_list = {}
+user_dic = {}
 
 @dataclass
 class State:
@@ -112,9 +112,9 @@ def get_collection():
 
 # create database instance
 # db = get_collection()
-client = MongoClient('localhost', 27017)
-db = client.flask_db
-activity = db.activity
+# client = MongoClient('localhost', 27017)
+# db = client.flask_db
+# activity = db.activity
 
 
 @name_space.route("/activity")
@@ -556,26 +556,38 @@ class MainClass(Resource):
                 onkey = ""
             if state == "login":
                 try:
-                    if user_list[info['username']] == info['password']:
-                        data = {
-                            "status": "authz",
-                            "password": "true"
-                        }
-                        info["password"] = "true"
+                    if user_dic.get(info['username']) is None:
+                        code = 100
                     else:
-                        data = {
-                            "status": "authz",
-                            "password": "false"
-                        }
-                        info["password"] = "wrong"
+                        if user_dic[info['username']] == info['password']:
+                            code = 300
+                        else:
+                            code = 100
                 except:
-                    user_list[info['username']] = info['password']
-                    data = {
-                        "status": "authz",
-                        "password": "new"
-                    }
-                    info["password"] = "new_user"
-                activity.insert_one(info)
+                    code = 400
+                data = {
+                    "status": code
+                }
+                response = jsonify(data)
+                console.log(data)
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                return response
+
+            elif state == "register":
+                try:
+                    if user_dic.get(info['username']) is not None:
+                        code = 200
+                    else:
+                        user_dic[info['username']] = info['password']
+                        code = 300
+                except:
+                    code = 400
+                data = {
+                    "status": code
+                }
                 response = jsonify(data)
                 console.log(data)
                 response.headers.add('Access-Control-Allow-Origin', '*')
@@ -659,7 +671,7 @@ class MainClass(Resource):
                 else:
                     info["changes"] = "All lines are the same"
 
-                activity.insert_one(info)
+                #activity.insert_one(info)
                 console.log(info)
                 response = jsonify({"status": "Updated recent writing actions in doc"})
                 response.headers.add('Access-Control-Allow-Origin', '*')
@@ -719,7 +731,7 @@ class MainClass(Resource):
                 info['state'] = "Paste"
                 info['clipboard'] = info.pop('cb')
             # add document to database
-            activity.insert_one(info)
+            # activity.insert_one(info)
             console.log(info)
 
             response = jsonify({"status": "Updated recent writing actions in doc"})

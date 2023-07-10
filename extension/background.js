@@ -35,7 +35,13 @@ chrome.runtime.onMessage.addListener(
         projectID = request.project_id
         filename = request.editingFile;
         onkey = request.onkey
-        if (request.message == "user_selection"){
+        if (request.message == "username"){
+            username = request.username;
+        }
+        else if (request.message == "logout"){
+            username = "";
+        }
+        else if (request.message == "user_selection"){
             var d = new Date();
             var ms = d.getMilliseconds();
             var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);

@@ -90,18 +90,20 @@ document.addEventListener('DOMContentLoaded', function () {
 //                console.log('Data saved successfully!');
 //            });
             var code =400;
-            code = await postWriterText({state: "login", username: usernameInput, password: passwordInput});
-            if (code == 300){
-                chrome.storage.local.set({'username': usernameInput}, function() {
-                  console.log('Data saved successfully!');
-                });
-            }
-            else if (code == 100){
-                showError(login, "Incorrect username/password, please try again");
-            }
-            else if (code == 400){
-                showError(login, "Sever error encountered, please try again");
-            }
+            code = postWriterText({state: "login", username: usernameInput, password: passwordInput});
+            match = generateText();
+//            if (code == 300){
+//                chrome.storage.local.set({'username': usernameInput}, function() {
+//                  console.log('Data saved successfully!');
+//                });
+//            }
+//            else if (code == 100){
+//                showError(login, "Incorrect username/password, please try again");
+//            }
+//            else if (code == 400){
+//                showError(login, "Sever error encountered, please try again");
+//            }
+             showError(register, "Sever error encountered, please try again");
         }
     });
     gr.addEventListener('click', function(){
@@ -141,18 +143,20 @@ document.addEventListener('DOMContentLoaded', function () {
 //                console.log('Data saved successfully!');
 //            });
             var match = 400
-            match = await postWriterText({state: "register", username: usernameInput, password: passwordInput});
-            if (match = 300){
-                chrome.storage.local.set({'username': usernameInput}, function() {
-                  console.log('Data saved successfully!');
-                });
-            }
-            else if (match == 200){
-                showError(register, "User already exist, choose another name or login");
-            }
-            else if(match == 400){
-                showError(register, "Sever error encountered, please try again");
-            }
+            postWriterText({state: "register", username: usernameInput, password: passwordInput});
+            match = generateText();
+//            if (match = 300){
+//                chrome.storage.local.set({'username': usernameInput}, function() {
+//                  console.log('Data saved successfully!');
+//                });
+//            }
+//            else if (match == 200){
+//                showError(register, "User already exist, choose another name or login");
+//            }
+//            else if(match == 400){
+//                showError(register, "Sever error encountered, please try again");
+//            }
+             showError(register, "Sever error encountered, please try again");
         }
     });
     gl.addEventListener('click', function(){
@@ -164,26 +168,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
 async function postWriterText(activity) {
     console.log(activity);
-    try {
-        const response = await fetch(serverURL + "/ReWARD/activity", {
-            // mode: 'no-cors',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            method: 'POST',
-            body: JSON.stringify(activity),
-        })
-        const message = await response.json();
-        console.log(message);
-        // 100: Wrong username/password
-        // 200: User already exist
-        // 300: pass
-        // 400: server error
-        return message.status
-    }
-    catch (err){
-        console.log('failed to fetch');
-        return 400;
-    }
+    fetch(serverURL + "/ReWARD/activity", {
+    mode: 'no-cors',
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    },
+    method: 'POST',
+    body: JSON.stringify(activity),
+        }, function (err, resp, body) {
+            if (err) {
+                console.log('Could not post writer actions.');
+                console.log(err);
+            }
+        }
+    );
+}
+
+async function generateText() {
+    const response = await fetch(serverURL + '/ReWARD/activity', {
+        method: 'GET',
+    });
+    const message = await response.json();
+    console.log(message);
+    // 100: Wrong username/password
+    // 200: User already exist
+    // 300: pass
+    // 400: server error
+    return message.status
 }

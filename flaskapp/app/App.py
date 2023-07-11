@@ -43,6 +43,7 @@ same_line_after = ""
 selected_text = ""
 paraphrase = ""
 user_dic = {}
+userRecord = {}
 
 @dataclass
 class State:
@@ -126,12 +127,48 @@ class MainClass(Resource):
                      'timestamp': 'The time at which writer action was recorded'})
     def get(self):
         try:
-            summary = "retrieving the writing actions real time from user input into the overleaf editor"
-            # resp_json = request.get_data()
-            # print(resp_json)
-            return {
-                "state": summary
-            }
+            if userRecord['state'] == "login":
+                try:
+                    if user_dic.get(userRecord['username']) is None:
+                        code = 100
+                    else:
+                        if user_dic[userRecord['username']] == userRecord['password']:
+                            code = 300
+                        else:
+                            code = 100
+                except:
+                    code = 400
+                data = {
+                    "status": code
+                }
+                response = jsonify(data)
+                console.log(data)
+                # response.headers.add('Access-Control-Allow-Origin', '*')
+                # response.headers.add('Access-Control-Allow-Credentials', 'true')
+                # response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                # response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                return response
+
+            elif userRecord['state'] == "register":
+                try:
+                    if user_dic.get(userRecord['username']) is not None:
+                        code = 200
+                    else:
+                        user_dic[userRecord['username']] = userRecord['password']
+                        code = 300
+                except:
+                    code = 400
+                data = {
+                    "status": code
+                }
+                response = jsonify(data)
+                console.log(data)
+                # response.headers.add('Access-Control-Allow-Origin', '*')
+                # response.headers.add('Access-Control-Allow-Credentials', 'true')
+                # response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                # response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                return response
+
 
         except KeyError as e:
             name_space.abort(500, e.__doc__, status="Could not retrieve information", statusCode="500")
@@ -547,49 +584,17 @@ class MainClass(Resource):
 
     def post(self):
         try:
-            global suggestion, same_line_before, same_line_after, selected_text, paraphrase
+            global suggestion, same_line_before, same_line_after, selected_text, paraphrase, userRecord
             info = request.get_json(force=True)
             state = info['state']
             try:
                 onkey = info['onkey']
             except:
                 onkey = ""
-            if state == "login":
-                try:
-                    if user_dic.get(info['username']) is None:
-                        code = 100
-                    else:
-                        if user_dic[info['username']] == info['password']:
-                            code = 300
-                        else:
-                            code = 100
-                except:
-                    code = 400
-                data = {
-                    "status": code
-                }
-                response = jsonify(data)
-                console.log(data)
-                response.headers.add('Access-Control-Allow-Origin', '*')
-                response.headers.add('Access-Control-Allow-Credentials', 'true')
-                response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-                return response
-
-            elif state == "register":
-                try:
-                    if user_dic.get(info['username']) is not None:
-                        code = 200
-                    else:
-                        user_dic[info['username']] = info['password']
-                        code = 300
-                except:
-                    code = 400
-                data = {
-                    "status": code
-                }
-                response = jsonify(data)
-                console.log(data)
+            if state == "login" or state == "register":
+                console.log(info)
+                userRecord = info
+                response = jsonify({"status": "Updated recent writing actions in doc"})
                 response.headers.add('Access-Control-Allow-Origin', '*')
                 response.headers.add('Access-Control-Allow-Credentials', 'true')
                 response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')

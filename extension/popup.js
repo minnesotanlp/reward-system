@@ -82,30 +82,26 @@ document.addEventListener('DOMContentLoaded', function () {
             showError(login, "Invalid username/password, please try again");
         }
         else {
-            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-                chrome.tabs.sendMessage(tabs[0].id, {message: "username", username: usernameInput}, function (response) {
-                });
-            });
-            chrome.storage.local.set({'username': usernameInput}, function() {
-                console.log('Data saved successfully!');
-            });
-//            var code = await postWriterText({state: "login", username: usernameInput, password: passwordInput});
-//            await chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-//                await chrome.tabs.sendMessage(tabs[0].id, {message: "username", username: usernameInput}, function (response) {
-//                    console.log(response);
+//            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+//                chrome.tabs.sendMessage(tabs[0].id, {message: "username", username: usernameInput}, function (response) {
 //                });
 //            });
-//            if (code == 300){
-//                chrome.storage.local.set({'username': usernameInput}, function() {
-//                  console.log('Data saved successfully!');
-//                });
-//            }
-//            else if (code == 100){
-//                showError(login, "Incorrect username/password, please try again");
-//            }
-//            else if (code == 400){
-//                showError(login, "Sever error encountered, please try again");
-//            }
+//            chrome.storage.local.set({'username': usernameInput}, function() {
+//                console.log('Data saved successfully!');
+//            });
+            var code =400;
+            code = await postWriterText({state: "login", username: usernameInput, password: passwordInput});
+            if (code == 300){
+                chrome.storage.local.set({'username': usernameInput}, function() {
+                  console.log('Data saved successfully!');
+                });
+            }
+            else if (code == 100){
+                showError(login, "Incorrect username/password, please try again");
+            }
+            else if (code == 400){
+                showError(login, "Sever error encountered, please try again");
+            }
         }
     });
     gr.addEventListener('click', function(){
@@ -137,30 +133,26 @@ document.addEventListener('DOMContentLoaded', function () {
             showError(register, "Two passwords mismatch, please try again");
         }
         else {
-            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-                chrome.tabs.sendMessage(tabs[0].id, {message: "username", username: usernameInput}, function (response) {
-                });
-            });
-            chrome.storage.local.set({'username': usernameInput}, function() {
-                console.log('Data saved successfully!');
-            });
-//            var match = await postWriterText({state: "register", username: usernameInput, password: passwordInput});
-//            await chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+//            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
 //                chrome.tabs.sendMessage(tabs[0].id, {message: "username", username: usernameInput}, function (response) {
-//                    console.log(response);
 //                });
 //            });
-//            if (match = 300){
-//                chrome.storage.local.set({'username': usernameInput}, function() {
-//                  console.log('Data saved successfully!');
-//                });
-//            }
-//            else if (match == 200){
-//                showError(register, "User already exist, choose another name or login");
-//            }
-//            else if(match == 400){
-//                showError(register, "Sever error encountered, please try again");
-//            }
+//            chrome.storage.local.set({'username': usernameInput}, function() {
+//                console.log('Data saved successfully!');
+//            });
+            var match = 400
+            match = await postWriterText({state: "register", username: usernameInput, password: passwordInput});
+            if (match = 300){
+                chrome.storage.local.set({'username': usernameInput}, function() {
+                  console.log('Data saved successfully!');
+                });
+            }
+            else if (match == 200){
+                showError(register, "User already exist, choose another name or login");
+            }
+            else if(match == 400){
+                showError(register, "Sever error encountered, please try again");
+            }
         }
     });
     gl.addEventListener('click', function(){
@@ -170,28 +162,28 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-//async function postWriterText(activity) {
-//    console.log(activity);
-//    try {
-//        const response = await fetch(serverURL + "/ReWARD/activity", {
-//            // mode: 'no-cors',
-//            headers: {
-//                'Accept': 'application/json',
-//                'Content-Type': 'application/json'
-//            },
-//            method: 'POST',
-//            body: JSON.stringify(activity),
-//        })
-//        const message = await response.json();
-//        console.log(message);
-//        // 100: Wrong username/password
-//        // 200: User already exist
-//        // 300: pass
-//        // 400: server error
-//        return message.status
-//    }
-//    catch (err){
-//        console.log('failed to fetch');
-//        return 400;
-//    }
-//}
+async function postWriterText(activity) {
+    console.log(activity);
+    try {
+        const response = await fetch(serverURL + "/ReWARD/activity", {
+            // mode: 'no-cors',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            method: 'POST',
+            body: JSON.stringify(activity),
+        })
+        const message = await response.json();
+        console.log(message);
+        // 100: Wrong username/password
+        // 200: User already exist
+        // 300: pass
+        // 400: server error
+        return message.status
+    }
+    catch (err){
+        console.log('failed to fetch');
+        return 400;
+    }
+}

@@ -809,6 +809,13 @@ class MainClass(Resource):
             print(traceback.print_exc())
             name_space.abort(400, e.__doc__, status="Could not save information", statusCode="400")
 
+    def options(self):
+        response = jsonify({'message': 'OK'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        return response
 
 if __name__ == "__main__":
     ENVIRONMENT_DEBUG = os.environ.get("APP_DEBUG", True)

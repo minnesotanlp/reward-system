@@ -1,5 +1,5 @@
 let serverURL;
-serverURL = "https://ed84-2607-ea00-117-00-15.ngrok.io"
+serverURL = "https://a060-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app"
 
 function clearError(event){
     var errMessage = document.querySelector('p[style="color: red; font-size: 14px;"]');

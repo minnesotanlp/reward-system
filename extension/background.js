@@ -36,9 +36,11 @@ chrome.runtime.onMessage.addListener(
         filename = request.editingFile;
         onkey = request.onkey
         if (request.message == "username"){
+            console.log("I got username");
             username = request.username;
         }
         else if (request.message == "logout"){
+            console.log("I got logout");
             username = "";
         }
         else if (request.message == "user_selection"){

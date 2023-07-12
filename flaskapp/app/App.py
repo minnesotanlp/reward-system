@@ -10,13 +10,23 @@ import os
 import diff_match_patch as dmp_module
 dmp = dmp_module.diff_match_patch()
 import traceback
+
 from rich.console import Console
 console = Console()
+
 from pymongo import MongoClient
 
 import spacy
-
 sent_tokenizer = spacy.load("en_core_web_sm")
+
+import pickle
+pickle_file_path = 'user_dic.pickle'
+user_dic = {}
+if os.path.exists(pickle_file_path):
+    if os.path.getsize(pickle_file_path) != 0:
+        with open(pickle_file_path, 'rb') as rfile:
+            user_dic = pickle.load(rfile)
+
 
 application = Flask(__name__)
 app = Api(app=application,
@@ -34,7 +44,7 @@ model = app.model('Recording Writer Actions for Rhetorical Adjustment',
 # mongo = PyMongo(application)
 # db = mongo.db
 
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = ""
 warnings.filterwarnings("ignore")
 MEMORY = 0
 suggestion = "abc"
@@ -42,8 +52,7 @@ same_line_before = ""
 same_line_after = ""
 selected_text = ""
 paraphrase = ""
-user_dic = {}
-userRecord = {}
+code = 400
 
 @dataclass
 class State:
@@ -73,14 +82,14 @@ def update(state, chat_output):
 
 def chat(current, state):
     command = "Please paraphrase this sentence/paragraph. Then tell me benefits of paraphrasing in this way along with " \
-              "methods you use with examples from paraphrased paragraph: \n\"" + current + "\n\"."\
-              "\nThe length of sentence should not be too long or too short than previous one." \
-              "Feel Free to use any methods that are appropriate for scholarly writing, "\
-              "but total number of methods using should not be more than four. \n"\
-              "Your response format should be looks like this: \n"\
-              "Paraphrase: [Paraphrased paragraph]\n" \
-               "---------------------------------------------------------\n" \
-               "Explanation: [Explanation of the paraphrase]"
+              "methods you use with examples from paraphrased paragraph: \n\"" + current + "\n\"." \
+                                                                                           "\nThe length of sentence should not be too long or too short than previous one." \
+                                                                                           "Feel Free to use any methods that are appropriate for scholarly writing, " \
+                                                                                           "but total number of methods using should not be more than four. \n" \
+                                                                                           "Your response format should be looks like this: \n" \
+                                                                                           "Paraphrase: [Paraphrased paragraph]\n" \
+                                                                                           "---------------------------------------------------------\n" \
+                                                                                           "Explanation: [Explanation of the paraphrase]"
     state = replace(state, human_input=command)
     return update(state, chat_response(state))
 
@@ -113,9 +122,9 @@ def get_collection():
 
 # create database instance
 # db = get_collection()
-# client = MongoClient('localhost', 27017)
-# db = client.flask_db
-# activity = db.activity
+client = MongoClient('localhost', 27017)
+db = client.flask_db
+activity = db.activity
 
 
 @name_space.route("/activity")
@@ -127,48 +136,12 @@ class MainClass(Resource):
                      'timestamp': 'The time at which writer action was recorded'})
     def get(self):
         try:
-            if userRecord['state'] == "login":
-                try:
-                    if user_dic.get(userRecord['username']) is None:
-                        code = 100
-                    else:
-                        if user_dic[userRecord['username']] == userRecord['password']:
-                            code = 300
-                        else:
-                            code = 100
-                except:
-                    code = 400
-                data = {
-                    "status": code
-                }
-                response = jsonify(data)
-                console.log(data)
-                # response.headers.add('Access-Control-Allow-Origin', '*')
-                # response.headers.add('Access-Control-Allow-Credentials', 'true')
-                # response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-                # response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-                return response
-
-            elif userRecord['state'] == "register":
-                try:
-                    if user_dic.get(userRecord['username']) is not None:
-                        code = 200
-                    else:
-                        user_dic[userRecord['username']] = userRecord['password']
-                        code = 300
-                except:
-                    code = 400
-                data = {
-                    "status": code
-                }
-                response = jsonify(data)
-                console.log(data)
-                # response.headers.add('Access-Control-Allow-Origin', '*')
-                # response.headers.add('Access-Control-Allow-Credentials', 'true')
-                # response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-                # response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-                return response
-
+            summary = "retrieving the writing actions real time from user input into the overleaf editor"
+            # resp_json = request.get_data()
+            # print(resp_json)
+            return {
+                "state": summary
+            }
 
         except KeyError as e:
             name_space.abort(500, e.__doc__, status="Could not retrieve information", statusCode="500")
@@ -584,23 +557,14 @@ class MainClass(Resource):
 
     def post(self):
         try:
-            global suggestion, same_line_before, same_line_after, selected_text, paraphrase, userRecord
+            global suggestion, same_line_before, same_line_after, selected_text, paraphrase
             info = request.get_json(force=True)
             state = info['state']
             try:
                 onkey = info['onkey']
             except:
                 onkey = ""
-            if state == "login" or state == "register":
-                console.log(info)
-                userRecord = info
-                response = jsonify({"status": "Updated recent writing actions in doc"})
-                response.headers.add('Access-Control-Allow-Origin', '*')
-                response.headers.add('Access-Control-Allow-Credentials', 'true')
-                response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-                return response
-            elif state == "assist":
+            if state == "assist":
                 # find where the selection begin
                 dmp.Match_Distance = 5000
                 start = dmp.match_main(info["current_content"], info["selected_text"], 0)
@@ -654,6 +618,7 @@ class MainClass(Resource):
                     dmp.diff_cleanupSemantic(diffs)
                     diffs_html = dmp.diff_prettyHtml(diffs)
 
+                activity.insert_one(info)
                 console.log(info)
                 data = {
                     "status": "ChatGPT",
@@ -676,7 +641,7 @@ class MainClass(Resource):
                 else:
                     info["changes"] = "All lines are the same"
 
-                #activity.insert_one(info)
+                activity.insert_one(info)
                 console.log(info)
                 response = jsonify({"status": "Updated recent writing actions in doc"})
                 response.headers.add('Access-Control-Allow-Origin', '*')
@@ -736,7 +701,7 @@ class MainClass(Resource):
                 info['state'] = "Paste"
                 info['clipboard'] = info.pop('cb')
             # add document to database
-            # activity.insert_one(info)
+            activity.insert_one(info)
             console.log(info)
 
             response = jsonify({"status": "Updated recent writing actions in doc"})
@@ -759,6 +724,91 @@ class MainClass(Resource):
         response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
         return response
+
+
+@name_space.route("/system")
+class MainClass(Resource):
+    check = 0
+
+    @app.doc(responses={200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error'},
+             params={'activity': 'data from most recent writing activity',
+                     'timestamp': 'The time at which writer action was recorded'})
+    def get(self):
+        try:
+            summary = "retrieving the writing actions real time from user input into the overleaf editor"
+            # resp_json = request.get_data()
+            # print(resp_json)
+            return {
+                "state": summary
+            }
+
+        except KeyError as e:
+            name_space.abort(500, e.__doc__, status="Could not retrieve information", statusCode="500")
+        except Exception as e:
+            name_space.abort(400, e.__doc__, status="Could not retrieve information", statusCode="400")
+
+    @app.doc(responses={200: 'OK', 400: 'Invalid Argument', 500: 'Mapping Key Error'},
+             params={'activity': 'data from most recent writing activity',
+                     'timestamp': 'The time at which writer action was recorded'})
+    @app.expect(model)
+    def post(self):
+        try:
+            global code
+            info = request.get_json(force=True)
+            state = info['state']
+            if state == "login":
+                try:
+                    if user_dic.get(info['username']) is None:
+                        code = 100
+                    else:
+                        if user_dic[info['username']] == info['password']:
+                            code = 300
+                        else:
+                            code = 100
+                except:
+                    code = 400
+                data = {
+                    "status": code
+                }
+                response = jsonify(data)
+                console.log(data)
+                with open(pickle_file_path, 'wb') as file:
+                    pickle.dump(user_dic, file, protocol=pickle.HIGHEST_PROTOCOL)
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                return response
+
+            elif state == "register":
+                try:
+                    if user_dic.get(info['username']) is not None:
+                        code = 200
+                    else:
+                        user_dic[info['username']] = info['password']
+                        code = 300
+                except:
+                    code = 400
+                data = {
+                    "status": code
+                }
+                response = jsonify(data)
+                console.log(data)
+                with open(pickle_file_path, 'wb') as file:
+                    pickle.dump(user_dic, file, protocol=pickle.HIGHEST_PROTOCOL)
+                response.headers.add('Access-Control-Allow-Origin', '*')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+                return response
+
+        except KeyError as e:
+            name_space.abort(500, e.__doc__, status="Could not save information", statusCode="500")
+
+        except Exception as e:
+            print(traceback.print_exc())
+            name_space.abort(400, e.__doc__, status="Could not save information", statusCode="400")
+
 
 if __name__ == "__main__":
     ENVIRONMENT_DEBUG = os.environ.get("APP_DEBUG", True)

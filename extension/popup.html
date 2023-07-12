@@ -21,22 +21,21 @@
                 <span class="slider round"></span>
             </label>
         </div>
-        <form id = "loginForm" style="display:block">
+        <div id = "loginForm" style="display:block">
           <input type="text" id="username" placeholder="Enter your username" required>
           <input type="password" id="password" placeholder="Enter your password" required>
-          <button type="submit">Login</button>
+          <button type="submit" id="log">Login</button>
            <p id="gr">New user? Register here!</p>
-        </form>
-         <form id = "regForm" style="display:none">
+        </div>
+         <div id = "regForm" style="display:none">
           <input type="text" id="newUser" placeholder="Enter your username" required>
           <input type="password" id="newPass" placeholder="Enter your password" required>
            <input type="password" id="confirmPass" placeholder="Confirm your password" required>
           <button type="submit" id="reg">Register</button>
           <p id="gl">Already a user? Login here!</p>
-        </form>
+        </div>
         <div id="welcomeMessage" style="display:none">
         </div>
         <button type="submit" id="lo" style="display:none">Logout</button>
     </body>
 </html>
-

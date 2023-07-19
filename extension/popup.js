@@ -1,12 +1,19 @@
 let serverURL;
-serverURL = "https://a060-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app"
+serverURL = ""
 
-function clearError(event){
-    var errMessage = document.querySelector('p[style="color: red; font-size: 14px;"]');
+function clearError(){
+    var errMessage = document.querySelectorAll('p[style="color: red; font-size: 14px;"]');
     console.log("here")
-    refnode = event.target;
     if (errMessage !== null){
-      refnode.parentNode.removeChild(errMessage);
+        errMessage.forEach((node) => {
+            node.parentNode.removeChild(node);;
+        });
+    }
+    var notiMessage = document.querySelectorAll('p[style="color: black; font-size: 14px;"]');
+    if (notiMessage !== null){
+        notiMessage.forEach((node) => {
+            node.parentNode.removeChild(node);;
+        });
     }
 };
 
@@ -24,6 +31,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var regForm = document.getElementById("regForm");
     var logout = document.getElementById("lo");
     var welcomeMessage = document.getElementById("welcomeMessage");
+    var sendURL = document.getElementById("sendURL");
+    var server = document.getElementById("serverURL");
 
     chrome.storage.local.get(['username'], function(result) {
         if (result.username !== undefined){
@@ -42,6 +51,14 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     });
+
+    chrome.storage.local.get('server', function (result) {
+        if (result.server !== undefined && result.server !== ""){
+            serverURL = result.server;
+            server.value = serverURL;
+        }
+    });
+
     checkbox.addEventListener('click', function () {
         console.log(checkbox.checked);
         chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -52,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log("confirmed");
         });
     });
+
     logout.addEventListener('click', function(){
         chrome.storage.local.remove('username', function() {
             console.log('Item has been removed from local storage');
@@ -63,6 +81,28 @@ document.addEventListener('DOMContentLoaded', function () {
         loginForm.style.display = "block";
     });
 
+    server.addEventListener('click', clearError);
+
+    sendURL.addEventListener('click', function(){
+        var URLInput = server.value;
+        clearError();
+        if (URLInput == ""){
+            showError(sendURL.nextSibling, "Invalid saver URL, please try again");
+        }
+        else{
+            serverURL = URLInput;
+            chrome.runtime.sendMessage({message: "serverURL", serverURL: URLInput});
+            chrome.storage.local.set({'server': URLInput}, function() {
+                  console.log('Sever URL saved successfully!');
+            });
+            var te = document.createElement("p");
+            te.innerText = "Successfully set up server URL!";
+            te.style.color = "black";
+            te.style.fontSize = "14px";
+            sendURL.parentNode.insertBefore(te, sendURL.nextSibling);
+        }
+    });
+
     var login = document.querySelector('button[type="submit"][id="log"]');
     var username = document.getElementById("username");
     var password = document.getElementById("password");
@@ -72,20 +112,13 @@ document.addEventListener('DOMContentLoaded', function () {
     password.addEventListener('click', clearError);
 
     login.addEventListener('click', async function(){
-        clearError(event);
+        clearError();
         var usernameInput = username.value;
         var passwordInput = password.value;
         if (usernameInput == "" || passwordInput == ""){
             showError(login, "Invalid username/password, please try again");
         }
         else {
-//            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-//                chrome.tabs.sendMessage(tabs[0].id, {message: "username", username: usernameInput}, function (response) {
-//                });
-//            });
-//            chrome.storage.local.set({'username': usernameInput}, function() {
-//                console.log('Data saved successfully!');
-//            });
             var code =400;
             code = await postWriterText({state: "login", username: usernameInput, password: passwordInput});
             if (code == 300){
@@ -107,7 +140,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
     gr.addEventListener('click', function(){
-        clearError(event);
+        clearError();
         regForm.style.display = "block";
         loginForm.style.display = "none";
     });
@@ -124,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function () {
     confirmPass.addEventListener('click', clearError);
 
     register.addEventListener('click', async function(){
-    	clearError(event);
+    	clearError();
         var usernameInput = newUser.value;
         var passwordInput = newPass.value;
         var confirmPassInput = confirmPass.value;
@@ -135,16 +168,9 @@ document.addEventListener('DOMContentLoaded', function () {
             showError(register, "Two passwords mismatch, please try again");
         }
         else {
-//            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-//                chrome.tabs.sendMessage(tabs[0].id, {message: "username", username: usernameInput}, function (response) {
-//                });
-//            });
-//            chrome.storage.local.set({'username': usernameInput}, function() {
-//                console.log('Data saved successfully!');
-//            });
             var match = 400
             match = await postWriterText({state: "register", username: usernameInput, password: passwordInput});
-            if (match = 300){
+            if (match == 300){
                 chrome.storage.local.set({'username': usernameInput}, function() {
                   console.log('Data saved successfully!');
                 });
@@ -163,14 +189,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
     gl.addEventListener('click', function(){
-        clearError(event);
+        clearError();
         regForm.style.display = "none";
         loginForm.style.display = "block";
     });
 });
 
 async function postWriterText(activity) {
-    console.log(activity);
     try {
         const response = await fetch(serverURL + "/ReWARD/system", {
             // mode: 'no-cors',

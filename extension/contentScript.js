@@ -37,6 +37,7 @@ chrome.runtime.onMessage.addListener(
             clearTimeout(timeout);
             console.log(request)
             paraphrase = request.suggestion;
+            explanation = request.explanation
             same_line_before = request.same_line_before;
             same_line_after = request.same_line_after;
 
@@ -49,6 +50,27 @@ chrome.runtime.onMessage.addListener(
                 styleToRemove.innerHTML = '';
                 tooltip.textContent = "Sorry, a server error encountered. Please try again later.";
                 document.addEventListener('click', tooltipClickRemove);
+            }
+            else if (explanation == ""){
+                tooltip.parentNode.removeChild(tooltip);
+                tooltip = null;
+                document.removeEventListener('click', tooltipClick);
+                var rightPanel = document.querySelector(".ui-layout-east.ui-layout-pane.ui-layout-pane-east")
+                var extensionURL = chrome.runtime.getURL('tooltip.html');
+                var time = (new Date()).toString().slice(0,21);
+                tooltip = document.createElement('aside')
+                tooltip.className = "Chat"
+                fetch(extensionURL)
+                    .then(response => response.text())
+                    .then(htmlContent => {
+                        tooltip.innerHTML = htmlContent;
+                        tooltip.querySelector('.date').textContent = time;
+                        tooltip.querySelectorAll('.message-content')[0].innerHTML = request.diffs_html;
+                        tooltip.querySelectorAll('.message-content')[1].textContent = "Sorry, ChatGPT didn't provide any explanation for this paraphrased text.";
+                        rightPanel.appendChild(tooltip);
+                        tooltip.querySelector('.accept-button').addEventListener('click', tooltipClick);
+                        tooltip.querySelector('.reject-button').addEventListener('click', tooltipClick);
+                    })
             }
             else{
                 tooltip.parentNode.removeChild(tooltip);
@@ -65,7 +87,7 @@ chrome.runtime.onMessage.addListener(
                         tooltip.innerHTML = htmlContent;
                         tooltip.querySelector('.date').textContent = time;
                         tooltip.querySelectorAll('.message-content')[0].innerHTML = request.diffs_html;
-                        tooltip.querySelectorAll('.message-content')[1].textContent = request.explanation;;
+                        tooltip.querySelectorAll('.message-content')[1].textContent = explanation;
                         rightPanel.appendChild(tooltip);
                         tooltip.querySelector('.accept-button').addEventListener('click', tooltipClick);
                         tooltip.querySelector('.reject-button').addEventListener('click', tooltipClick);
@@ -472,7 +494,7 @@ function AI_Paraphrase(){
         styleToRemove.innerHTML = '';
         tooltip.textContent = "Sorry, a server error encountered. Please try again later.";
         document.addEventListener('click', tooltipClickRemove);
-    }, 10000);
+    }, 15000);
 }
 
 // The tooltip disappears no matter where the user clicks
@@ -485,39 +507,39 @@ function tooltipClickRemove(){
 
 //Replace text if user click inside the tooltip; remove the tooltip if user clicks outside it
 function tooltipClick(event) {
-  if (event.target === tooltip.querySelector('.reject-button')) {
-    tooltip.removeEventListener('click', tooltipClick);
-    tooltip.parentNode.removeChild(tooltip);
-    tooltip = null;
-    chrome.runtime.sendMessage({message: "user_selection", accept: false});
-  }
-  else if (event.target === tooltip.querySelector('.accept-button')){
-    console.log("1: ",same_line_before);
-    console.log("2: ",paraphrase);
-    console.log("3: ",same_line_after);
-    var startIndex;
-    var endIndex;
-    var substring;
-    var string = same_line_before + paraphrase + same_line_after;
-    var num_of_replace_line = end - start + 1
-    // Calculate the desired length of each substring
-    var substringLength = Math.ceil(string.length / num_of_replace_line);
-    // assign each substring to each line
-    for (let i = 0; i < num_of_replace_line; i++) {
-        startIndex = i * substringLength;
-        endIndex = startIndex + substringLength;
-        lines[start+i].innerText = string.substring(startIndex, endIndex);
+    if (event.target === tooltip.querySelector('.reject-button')) {
+        tooltip.removeEventListener('click', tooltipClick);
+        tooltip.parentNode.removeChild(tooltip);
+        tooltip = null;
+        chrome.runtime.sendMessage({message: "user_selection", accept: false});
     }
+    else if (event.target === tooltip.querySelector('.accept-button')){
+        console.log("1: ",same_line_before);
+        console.log("2: ",paraphrase);
+        console.log("3: ",same_line_after);
+        var startIndex;
+        var endIndex;
+        var substring;
+        var string = same_line_before + paraphrase + same_line_after;
+        var num_of_replace_line = end - start + 1
+        // Calculate the desired length of each substring
+        var substringLength = Math.ceil(string.length / num_of_replace_line);
+        // assign each substring to each line
+        for (let i = 0; i < num_of_replace_line; i++) {
+            startIndex = i * substringLength;
+            endIndex = startIndex + substringLength;
+            lines[start+i].innerText = string.substring(startIndex, endIndex);
+        }
 
-    tooltip.parentNode.removeChild(tooltip);
-    tooltip = null;
-    getEditingText();
-    paragraph = editingParagraph;
-    paragraphArray = editingArray;
-    paragraphLines = editingLines;
-    document.removeEventListener('click', tooltipClick);
-    chrome.runtime.sendMessage({message: "user_selection", accept: true, revisions: editingParagraph});
-  }
+        tooltip.parentNode.removeChild(tooltip);
+        tooltip = null;
+        getEditingText();
+        document.removeEventListener('click', tooltipClick);
+        chrome.runtime.sendMessage({editingFile: filename, message: "user_selection", accept: true, revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id});
+        paragraph = editingParagraph;
+        paragraphArray = editingArray;
+        paragraphLines = editingLines;
+    }
 }
 
 let excludedKeys = ["Meta", "Alt", "Tab","Shift","CapsLock","ArrowUp", "Control", "ArrowDown", "ArrowLeft","ArrowRight"];

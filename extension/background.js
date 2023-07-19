@@ -1,7 +1,7 @@
 let serverURL;
 // serverURL = "http://127.0.0.1:5000/"
 // serverURL = "http://localhost"
-serverURL =  "https://a060-2607-ea00-101-3c26-e24f-43ff-fee6-145c.ngrok-free.app";
+serverURL =  "";
 let headers = new Headers();
 headers.append('GET', 'POST', 'OPTIONS');
 headers.append('Access-Control-Allow-Origin', 'http://127.0.0.1:5000/');
@@ -22,6 +22,12 @@ let suggestion = ""
 let onkey = ""
 let username = ""
 
+chrome.storage.local.get(['server'], function(result) {
+    if (result.server !== undefined && result.server !== ""){
+        serverURL = result.server;
+    }
+});
+
 chrome.storage.local.get(['username'], function(result) {
     if (result.username !== undefined){
         username = result.username;
@@ -37,11 +43,17 @@ chrome.runtime.onMessage.addListener(
         onkey = request.onkey
         if (request.message == "username"){
             console.log("I got username");
+            console.log(request.username);
             username = request.username;
         }
         else if (request.message == "logout"){
             console.log("I got logout");
             username = "";
+        }
+        else if (request.message == "serverURL"){
+            console.log("I got serverURL");
+            console.log(request.serverURL);
+            serverURL = request.serverURL;
         }
         else if (request.message == "user_selection"){
             var d = new Date();
@@ -51,7 +63,8 @@ chrome.runtime.onMessage.addListener(
                 postWriterText({state: "user_selection", username: username, timestamp: time, accept: false});
             }
             else{
-                postWriterText({state: "user_selection", username: username, timestamp: time, accept: true});
+                changemade = difference(request.text, request.revisions);
+                postWriterText({state: "user_selection", username: username, timestamp: time, accept: true, project: projectID, file: filename, text: request.revisions, revision: changemade});
                 text = [request.revisions];
             }
         }

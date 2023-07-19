@@ -8,24 +8,17 @@ from dataclasses import dataclass, replace
 from minichain import OpenAI, prompt, show, transform, Mock
 import os
 import diff_match_patch as dmp_module
-dmp = dmp_module.diff_match_patch()
 import traceback
-
 from rich.console import Console
+from pymongo import MongoClient
+import spacy
+import bcrypt
+
+dmp = dmp_module.diff_match_patch()
+
 console = Console()
 
-from pymongo import MongoClient
-
-import spacy
 sent_tokenizer = spacy.load("en_core_web_sm")
-
-import pickle
-pickle_file_path = 'user_dic.pickle'
-user_dic = {}
-if os.path.exists(pickle_file_path):
-    if os.path.getsize(pickle_file_path) != 0:
-        with open(pickle_file_path, 'rb') as rfile:
-            user_dic = pickle.load(rfile)
 
 
 application = Flask(__name__)
@@ -81,15 +74,22 @@ def update(state, chat_output):
 
 
 def chat(current, state):
-    command = "Please paraphrase this sentence/paragraph. Then tell me benefits of paraphrasing in this way along with " \
-              "methods you use with examples from paraphrased paragraph: \n\"" + current + "\n\"." \
-                                                                                           "\nThe length of sentence should not be too long or too short than previous one." \
-                                                                                           "Feel Free to use any methods that are appropriate for scholarly writing, " \
-                                                                                           "but total number of methods using should not be more than four. \n" \
-                                                                                           "Your response format should be looks like this: \n" \
-                                                                                           "Paraphrase: [Paraphrased paragraph]\n" \
-                                                                                           "---------------------------------------------------------\n" \
-                                                                                           "Explanation: [Explanation of the paraphrase]"
+    command = "Please paraphrase this sentence/paragraph: \n\"" + current + "\"\nThen explain to me methods you use with examples from paraphrased paragraph." \
+                "The length of sentence should not be too long or too short than previous one." \
+                "Feel Free to use any methods that are appropriate for scholarly writing, but total number of methods using should not be more than four. \n" \
+                "Your response format should be looks like this: \n\"" \
+                "Paraphrase: [Paraphrased paragraph]\n" \
+                "---------------------------------------------------------\n" \
+                "Explanation: [Explanation of the paraphrase].\"\n" \
+                "You must include \"---------------------------------------------------------\" between paraphrase and explanation!"
+    # command = "Please paraphrase this sentence/paragraph. Then explain to me methods you use with examples from paraphrased paragraph: \n\"" + current + "\"\n" \
+    #             "The length of sentence should not be too long or too short than previous one." \
+    #             "Feel Free to use any methods that are appropriate for scholarly writing, " \
+    #             "but total number of methods using should not be more than four. \n" \
+    #             "Your response format should be looks like this: \n" \
+    #             "Paraphrase: [Paraphrased paragraph]\n" \
+    #             "---------------------------------------------------------\n" \
+    #             "Explanation: [Explanation of the paraphrase]"
     state = replace(state, human_input=command)
     return update(state, chat_response(state))
 
@@ -125,6 +125,7 @@ def get_collection():
 client = MongoClient('localhost', 27017)
 db = client.flask_db
 activity = db.activity
+user_data = db["user_data"]
 
 
 @name_space.route("/activity")
@@ -566,6 +567,7 @@ class MainClass(Resource):
                 onkey = ""
             if state == "assist":
                 # find where the selection begin
+                console.log(info)
                 dmp.Match_Distance = 5000
                 start = dmp.match_main(info["current_content"], info["selected_text"], 0)
                 end = start + len(info["selected_text"]) - 1
@@ -594,13 +596,19 @@ class MainClass(Resource):
                 after = same_line_after + info["pos_content"]
                 try:
                     suggestion = str(chat(selected_text, State([])).run())
-                    separator = "---------------------------------------------------------"
-                    split_response = suggestion.split(separator)
-                    if len(split_response) < 2:
-                        return None, None
-                    paraphrase = split_response[0].replace("Paraphrase:", "", 1).strip()
-                    explanation = split_response[1].replace("Explanation:", "", 1).strip()
                 except:
+                    print(traceback.print_exc())
+                    suggestion = ""
+                if suggestion != "":
+                    try:
+                        separator = "---------------------------------------------------------"
+                        split_response = suggestion.split(separator)
+                        paraphrase = split_response[0].replace("Paraphrase:", "", 1).strip()
+                        explanation = split_response[1].replace("Explanation:", "", 1).strip()
+                    except:
+                        paraphrase = suggestion
+                        explanation = ""
+                else:
                     paraphrase = ""
                     explanation = ""
                 # setup all logging info
@@ -751,6 +759,15 @@ class MainClass(Resource):
              params={'activity': 'data from most recent writing activity',
                      'timestamp': 'The time at which writer action was recorded'})
     @app.expect(model)
+    def hash_password(self, password):
+        salt = bcrypt.gensalt()
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+        return salt, hashed_password
+
+    def verify_password(self, password, stored_salt, stored_hash):
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), stored_salt)
+        return hashed_password == stored_hash
+
     def post(self):
         try:
             global code
@@ -758,22 +775,24 @@ class MainClass(Resource):
             state = info['state']
             if state == "login":
                 try:
-                    if user_dic.get(info['username']) is None:
+                    result = user_data.find_one({"username": info['username']})
+                    print(result)
+                    if result == None:
                         code = 100
                     else:
-                        if user_dic[info['username']] == info['password']:
+                        if self.verify_password(info['password'], result['salt'], result['hashed_password']):
                             code = 300
                         else:
                             code = 100
                 except:
+                    print(traceback.print_exc())
                     code = 400
                 data = {
                     "status": code
                 }
                 response = jsonify(data)
                 console.log(data)
-                with open(pickle_file_path, 'wb') as file:
-                    pickle.dump(user_dic, file, protocol=pickle.HIGHEST_PROTOCOL)
+
                 response.headers.add('Access-Control-Allow-Origin', '*')
                 response.headers.add('Access-Control-Allow-Credentials', 'true')
                 response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -782,10 +801,12 @@ class MainClass(Resource):
 
             elif state == "register":
                 try:
-                    if user_dic.get(info['username']) is not None:
+                    result = user_data.find_one({"username": info['username']})
+                    if result:
                         code = 200
                     else:
-                        user_dic[info['username']] = info['password']
+                        salt, hashed_password = self.hash_password(info['password'])
+                        user_data.insert_one({"username": info['username'], "salt": salt, "hashed_password": hashed_password})
                         code = 300
                 except:
                     code = 400
@@ -794,8 +815,6 @@ class MainClass(Resource):
                 }
                 response = jsonify(data)
                 console.log(data)
-                with open(pickle_file_path, 'wb') as file:
-                    pickle.dump(user_dic, file, protocol=pickle.HIGHEST_PROTOCOL)
                 response.headers.add('Access-Control-Allow-Origin', '*')
                 response.headers.add('Access-Control-Allow-Credentials', 'true')
                 response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')

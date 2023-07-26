@@ -694,7 +694,6 @@ class MainClass(Resource):
                 info["changes"] = changes
 
             info.pop('onkey')
-            info.pop('line')
             if state == 0 or state == 4:
                 info['state'] = "Type"
                 info.pop('cb')

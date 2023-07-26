@@ -11,6 +11,8 @@ const reg1 = /(\\author(?:\[(\d*)\])*{+[^}\n\\]+}*)/g;
 const reg2 = /(\\affil(?:\[(\d*)\])*{+[^}\n\\]+}*)/g;
 let file;
 let filename;
+let lineArea;
+let fileObserver;
 
 let paragraphArray = [];
 let editingArray = [];
@@ -174,14 +176,14 @@ function getEditingText() { // find areas in current file that reader may be rea
     editingArray = [];
     editingLines = [];
     let textarea = document.getElementsByClassName("cm-content cm-lineWrapping")[0];
-    let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
+    lineArea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
 
     // Determine whether active line is visible. If count equal to three, active line is NOT visible
     var elements = textarea.querySelectorAll('div[contenteditable="false"][style]');
     var count = elements.length;
 
     lines = textarea.childNodes;
-    var length = linearea.length;
+    var length = lineArea.length;
     var k = 1
     var offset = 0
 
@@ -203,7 +205,7 @@ function getEditingText() { // find areas in current file that reader may be rea
             line = "\n"+line;
         }
         editingParagraph += line;
-        editingLines.push(linearea[k - offset].textContent);
+        editingLines.push(lineArea[k - offset].textContent);
     }
 
     editingParagraph = editingParagraph.replace(reg1, '\\author{anonymous}');
@@ -247,7 +249,7 @@ function sleep(ms) {
 }
 
 async function filePost(){
-    editingObserver.disconnect();
+    fileObserver.disconnect();
     file = document.querySelector('[aria-selected = "true"]');
     console.log(file);
     f = file.getAttribute("aria-label");
@@ -269,10 +271,9 @@ async function filePost(){
     paragraphArray = editingArray;
     paragraphLines = editingLines;
     destroy();
-    editingObserver.observe(file, {attributeFilter: ["aria-selected", "selected"]});
+    fileObserver.observe(file, {attributeFilter: ["aria-selected", "selected"]});
 }
 
-const editingObserver = new MutationObserver(filePost);
 
 window.addEventListener("load", async function(){
     paragraph = "";
@@ -285,7 +286,7 @@ window.addEventListener("load", async function(){
         loadNode = document.getElementsByClassName("loading-panel ng-hide")[0];
     }
     let textarea = document.getElementsByClassName("cm-content cm-lineWrapping");
-    let linearea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
+    lineArea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes;
 
     // Add event listeners to detect user undo/redo action
     var inputElements = document.querySelectorAll(".cm-content.cm-lineWrapping");
@@ -294,7 +295,7 @@ window.addEventListener("load", async function(){
     });
 
     lines = textarea[0].childNodes;
-    var length = linearea.length;
+    var length = lineArea.length;
     console.log("textlen", lines.length)
     console.log("linelen", length)
     for (var k = 1; k < length; k++) {
@@ -307,7 +308,7 @@ window.addEventListener("load", async function(){
             line = "\n"+line;
         }
         paragraph += line;
-        paragraphLines.push(linearea[k].textContent);
+        paragraphLines.push(lineArea[k].textContent);
     }
     paragraph = paragraph.replace(reg1, '\\author{anonymous}');
     paragraph = paragraph.replace(reg2, '\\affil{anonymous}');
@@ -334,7 +335,7 @@ window.addEventListener("load", async function(){
     })
 
     // switch document mutation observer setup
-    const fileObserver = new MutationObserver(filePost);
+    fileObserver = new MutationObserver(filePost);
     const fileConfig = {attributeFilter: ["aria-selected", "selected"]};
     fileObserver.observe(file, fileConfig);
 
@@ -357,6 +358,74 @@ window.addEventListener("load", async function(){
     toolbarRight.insertBefore(AI_Paraphrase_button, onlineUsers.nextSibling);
     AI_Paraphrase_button.addEventListener('click', AI_Paraphrase)
 });
+
+function getActiveLine(){
+    // get selected information such as html element, text, and position relative to viewers' screen
+    var selected_element = window.getSelection();
+    var selected_range = selected_element.getRangeAt(0); //get the text range
+
+    var startContainer = selected_range.startContainer;
+    while((startContainer?.className) !== "cm-line" && (startContainer?.className) !== "cm-activeLine cm-line"){
+        startContainer = startContainer.parentElement
+    }
+
+    var selected_pos = startContainer.getBoundingClientRect();
+    console.log(selected_pos);
+    const cm_content = document.getElementsByClassName("cm-content cm-lineWrapping");
+    lines = cm_content[0].childNodes;
+    var length = lines.length;
+    var found_range = undefined;        // The range object of selected elements
+    var DOMRectArray = [];              // An DOMRect object array. DOMRect: the size and position of an element
+    var num_of_rows = 0;                // Number of rows of selected text in Latex editor
+    var i = 1;                          // loop variable
+    var start = 0;                      // startContainer's position
+    var end = 0;                        // endContainer's position
+    var skipCheck = 0;                  // Whether found the position of startContainer
+    var breakCheck = 0;                 // Whether found the Position of endContainer
+
+    // algorithm to get the selected line.
+    // This could help us get the context and feed into ChatGPT
+    var countStart = 0
+    var textArray = []
+    for (; i<length; i++){
+        line = lines[i].innerText;
+        if (line !== '\n'){
+            textArray.push(line);
+        }
+        else{
+            textArray.push('');
+        }
+        if (line === startContainer.innerText){
+            countStart += 1
+        }
+    }
+
+    console.log("countStart: ",countStart)
+    for (i=1; i<length; i++){
+        line = lines[i].innerText;
+        console.log(line);
+        if (skipCheck == 0 && line === startContainer.innerText){
+            console.log("here");
+//            found_range = lines[i].ownerDocument.createRange();
+//            found_range.selectNodeContents(lines[i]);
+//
+//            DOMRectArray = Array.from(found_range.getClientRects());
+//            console.log(DOMRectArray);
+//            num_of_rows = DOMRectArray.length / countStart;
+            found_range = lines[i].getBoundingClientRect();
+            if (found_range.top.toFixed(3) === selected_pos.top.toFixed(3)){
+                // reassign "start". Now "start" is no longer a loop variable but start position of selection
+                start = i;
+                skipCheck = 1;
+            }
+            else{
+                start = start + num_of_rows;
+            }
+        }
+    }
+    console.log(start);
+    return start;
+}
 
 function AI_Paraphrase(){
     // get selected information such as html element, text, and position relative to viewers' screen
@@ -464,7 +533,6 @@ function AI_Paraphrase(){
     }
     console.log(start)
     console.log(end)
-    let lineArea = document.getElementsByClassName("cm-gutter cm-lineNumbers")[0].childNodes
     lineNumbers = lineArea[start].innerText + " - "+ lineArea[end].innerText
     console.log(lineNumbers)
     pre_content = textArray.slice(0, start - 1).join('\n')
@@ -551,23 +619,27 @@ document.body.onkeyup = function (e) { // save every keystroke
         if (EXTENSION_TOGGLE) {
             getEditingText();
             if(state == 1){
-            console.log(e.key);
-            chrome.runtime.sendMessage({editingFile: filename,message: "cut", revisions: editingParagraph, text: paragraph, cutted: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
-            state = 0
+                console.log(e.key);
+                var start = getActiveLine();
+                chrome.runtime.sendMessage({editingFile: filename,message: "cut", revisions: editingParagraph, text: paragraph, cutted: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key, start: lineArea[start].innerText});
+                state = 0
             }
             else if(state == 2){
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "copy", revisions: editingParagraph, text: paragraph, copied: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
+                var start = getActiveLine();
+                chrome.runtime.sendMessage({editingFile: filename, message: "copy", revisions: editingParagraph, text: paragraph, copied: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key, start: lineArea[start].innerText});
                 state = 0
             }
             else if(state == 3){
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "paste", revisions: editingParagraph, text: paragraph, pasted: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
+                var start = getActiveLine();
+                chrome.runtime.sendMessage({editingFile: filename, message: "paste", revisions: editingParagraph, text: paragraph, pasted: pasteData, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key, start: lineArea[start].innerText});
                 state = 0
             }
             else{
                 console.log(e.key);
-                chrome.runtime.sendMessage({editingFile: filename, message: "listeners", revisions: editingParagraph, text: paragraph,  editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key});
+                var start = getActiveLine();
+                chrome.runtime.sendMessage({editingFile: filename, message: "listeners", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: e.key, start: lineArea[start].innerText});
             }
             paragraph = editingParagraph;
             paragraphArray = editingArray;
@@ -580,8 +652,9 @@ function checkUndoOrRevert(element, event) {
   if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
     console.log("Undo or revert event detected");
     getEditingText();
+    var start = getActiveLine();
     if (EXTENSION_TOGGLE) {
-        chrome.runtime.sendMessage({editingFile: filename, message: "undo", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, onkey: "z"});
+        chrome.runtime.sendMessage({editingFile: filename, message: "undo", revisions: editingParagraph, text: paragraph, editingLines: editingLines, editingArray: editingArray, paragraphLines: paragraphLines, paragraphArray: paragraphArray, project_id: project_id, onkey: "z", start: lineArea[start].innerText});
     }
     paragraph = editingParagraph;
     paragraphArray = editingArray;

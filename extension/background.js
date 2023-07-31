@@ -213,8 +213,7 @@ function trackWriterAction(state, writerText, revisions, ln) {
      return 0
     }
     var d = new Date();
-    var ms = d.getMilliseconds();
-    var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,)
+    var time = d.getTime();
     if (state == 3){
         postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: writerText, revision: revisions,
         state: state, cb: clipboard, line: ln, onkey: onkey})

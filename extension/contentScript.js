@@ -406,12 +406,6 @@ function getActiveLine(){
         console.log(line);
         if (skipCheck == 0 && line === startContainer.innerText){
             console.log("here");
-//            found_range = lines[i].ownerDocument.createRange();
-//            found_range.selectNodeContents(lines[i]);
-//
-//            DOMRectArray = Array.from(found_range.getClientRects());
-//            console.log(DOMRectArray);
-//            num_of_rows = DOMRectArray.length / countStart;
             found_range = lines[i].getBoundingClientRect();
             if (found_range.top.toFixed(3) === selected_pos.top.toFixed(3)){
                 // reassign "start". Now "start" is no longer a loop variable but start position of selection

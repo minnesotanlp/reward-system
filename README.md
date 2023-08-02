@@ -9,7 +9,8 @@ Linghe Wang, Dongyeop Kang <br>
 > [The Second Workshop on Intelligent and Interactive Writing Assistants (In2writing)](https://in2writing.glitch.me/) <br>
 > [Demo](https://minnesotanlp.github.io/REWARD_demo/)
 
-
+### Future Development
+This repository will no longer have any new commits. For all future updates of Chrome extension and server application, please checkout this repository link: [https://github.com/minnesotanlp/scholawrite](https://github.com/minnesotanlp/scholawrite)
 
 ### Requirements
 You will need to install flask==2.1.3, werkzeug==2.1.2, and flask-restx. Installing flask may automatically install a newer version of werkzeug. Werkzeug can be downgraded by running `pip install werkzeug==2.1.2`.

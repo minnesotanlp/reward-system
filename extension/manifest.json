@@ -9,7 +9,14 @@
     "activeTab",
     "background",
     "declarativeContent",
-    "notifications"
+    "notifications",
+    "web_accessible_resources"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["tooltip.html"],
+      "matches": ["*://*.overleaf.com/*"]
+    }
   ],
   "host_permissions": [
     "http://127.0.0.1:5000/*",

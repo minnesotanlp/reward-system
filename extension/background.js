@@ -1,7 +1,7 @@
 let serverURL;
 // serverURL = "http://127.0.0.1:5000/"
 // serverURL = "http://localhost"
-serverURL = "your_url_here";
+serverURL =  "";
 let headers = new Headers();
 headers.append('GET', 'POST', 'OPTIONS');
 headers.append('Access-Control-Allow-Origin', 'http://127.0.0.1:5000/');
@@ -19,33 +19,71 @@ let lineNumber;
 let copyLineNumbers;
 let projectID = "no url"
 let suggestion = ""
+let onkey = ""
+let username = ""
+
+chrome.storage.local.get(['server'], function(result) {
+    if (result.server !== undefined && result.server !== ""){
+        serverURL = result.server;
+    }
+});
+
+chrome.storage.local.get(['username'], function(result) {
+    if (result.username !== undefined){
+        username = result.username;
+    }
+});
 
 chrome.runtime.onMessage.addListener(
     function (request, sender, sendResponse) {
         console.log("Entered");
         text = text.filter(function(element) {return element !== undefined;});
+        console.log(text);
         projectID = request.project_id
         filename = request.editingFile;
-        if (request.message == "assist"){
+        onkey = request.onkey
+        if (request.message == "username"){
+            console.log("I got username");
+            console.log(request.username);
+            username = request.username;
+        }
+        else if (request.message == "logout"){
+            console.log("I got logout");
+            username = "";
+        }
+        else if (request.message == "serverURL"){
+            console.log("I got serverURL");
+            console.log(request.serverURL);
+            serverURL = request.serverURL;
+        }
+        else if (request.message == "user_selection"){
             var d = new Date();
             var ms = d.getMilliseconds();
             var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
-            postWriterText({state: "assist",timestamp: time, project: projectID, file: filename, pre_content: request.pre_content,
-            pos_content: request.pos_content, selected_text: request.selected_text, current_content: request.current_line_content,
-            current_line_content: request.current_line_content, line: request.line});
-            generateText();
+            if (request.accept == false){
+                postWriterText({state: "user_selection", username: username, timestamp: time, accept: false});
+            }
+            else{
+                changemade = difference(request.text, request.revisions);
+                postWriterText({state: "user_selection", username: username, timestamp: time, accept: true, project: projectID, file: filename, text: request.revisions, revision: changemade});
+                text = [request.revisions];
+            }
         }
-        else{
-            lineNumber = findLineEdit(request.edittingLines, request.edittingArray, request.paragraphLines, request.paragraphArray);
+        else if (request.message == "assist"){
+            var d = new Date();
+            var ms = d.getMilliseconds();
+            var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,);
+            postWriterText({state: "assist", username: username, timestamp: time, project: projectID, file: filename, pre_content: request.pre_content,
+            pos_content: request.pos_content, selected_text: request.selected_text, current_content: request.current_line_content,
+            line: request.line});
         }
         if (request.message == "listeners") {
             // process edits, find the diff, as additions or deletions
            console.log("***** press *****");
            text.push(request.text);
-           console.log(text)
-           console.log(request.revisions);
+           lineNumber = request.start;
            if (prelineNumber == null){
-               prelineNumber = lineNumber;
+               prelineNumber = request.start;
            }
            if (prelineNumber != lineNumber && lineNumber != null){
                console.log("***** different line *****");
@@ -58,10 +96,15 @@ chrome.runtime.onMessage.addListener(
                prelineNumber = lineNumber
            }
         }
+        else if (request.message == "undo") {
+            console.log("***** undo *****");
+            text.push(request.text);
+            lineNumber = request.start;
+            trackWriterAction(0, request.text, request.revisions, lineNumber);
+        }
         else if (request.message == "hidden") {
             // process edits, find the diff, as additions or deletions
            console.log("***** hidden *****");
-           console.log(request.revisions);
            // text.push(request.text);
            if (text[0] != null && request.revisions != null){
                trackWriterAction(4, text[0], request.revisions, lineNumber);
@@ -71,17 +114,17 @@ chrome.runtime.onMessage.addListener(
         }
         else if (request.message == "scroll"){
             console.log("***** scroll *****");
-            console.log(request.revisions);
             if (text[0] !== undefined && text.length > 1){
+                console.log(lineNumber)
                 trackWriterAction(4, text[0], request.text, lineNumber);
-                prelineNumber = lineNumber
+                prelineNumber = null
             }
             text = [request.revisions];
         }
         else if (request.message == "switch"){
             console.log("***** switch *****");
-            console.log(request.revisions);
-            if (text[0] !== undefined && text.length > 1){
+            if (text[0] !== undefined && text.length >= 1){
+                console.log(text);
                 trackWriterAction(4, text[0], request.text, lineNumber);
                 prelineNumber = lineNumber
             }
@@ -94,6 +137,7 @@ chrome.runtime.onMessage.addListener(
            if(text[0] !== undefined){
             trackWriterAction(4, text[0], request.text, prelineNumber);
            }
+           lineNumber = request.start;
            trackWriterAction(1, request.text, request.revisions, lineNumber);
            text = [request.revisions];
         }
@@ -104,7 +148,8 @@ chrome.runtime.onMessage.addListener(
            if(text[0] !== undefined){
             trackWriterAction(4, text[0], request.text, prelineNumber);
            }
-           copyLineNumbers = request.edittingLines
+           copyLineNumbers = request.editingLines
+           lineNumber = request.start;
            trackWriterAction(2, request.text, request.revisions, lineNumber);
            text = [request.revisions];
         }
@@ -116,27 +161,28 @@ chrome.runtime.onMessage.addListener(
            if(text[0] !== undefined){
             trackWriterAction(4, text[0], request.text, prelineNumber);
            }
+           lineNumber = request.start;
            trackWriterAction(3, request.text, request.revisions, lineNumber);
            text = [request.revisions];
         }
+         console.log(text);
+         sendResponse({message: true});
     }
 );
 
-function findLineEdit(edittingLines, edittingArray, paragraphLines, paragraphArray) {
-    if (edittingArray.length > paragraphArray.length) {  // line(s) added
+function findLineEdit(editingLines, editingArray, paragraphLines, paragraphArray) {
+    if (editingArray.length > paragraphArray.length) {  // line(s) added
         for (let i = 0; i < paragraphArray.length; i++){
-            if (paragraphArray[i] != edittingArray[i]){
-               console.log(parseInt(paragraphLines[i]) + (edittingArray.length - paragraphArray.length));
-               return (parseInt(paragraphLines[i]) + (edittingArray.length - paragraphArray.length))
+            if (paragraphArray[i] != editingArray[i]){
+               return (parseInt(paragraphLines[i]) + (editingArray.length - paragraphArray.length))
             }
         }
-        console.log(edittingLines[edittingArray.length - 1])
-        return edittingLines[edittingArray.length - 1]
+        console.log(editingLines[editingArray.length - 1])
+        return editingLines[editingArray.length - 1]
     } else {
-        for (let i = 0; i < edittingArray.length; i++){
-            if(edittingArray[i] != paragraphArray[i]){
-               console.log(edittingLines[i])
-               return parseInt(edittingLines[i])
+        for (let i = 0; i < editingArray.length; i++){
+            if(editingArray[i] != paragraphArray[i]){
+               return parseInt(editingLines[i])
             }
         }
         console.log("All lines are the same");
@@ -167,57 +213,62 @@ function trackWriterAction(state, writerText, revisions, ln) {
      return 0
     }
     var d = new Date();
-    var ms = d.getMilliseconds();
-    var time = d.toString().slice(0,24)+':'+ms+d.toString().slice(24,)
+    var time = d.getTime();
     if (state == 3){
-        postWriterText({timestamp: time, project: projectID, file: filename, text: writerText, revision: revisions,
-        state: state, cb: clipboard, line: ln})
+        postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: writerText, revision: revisions,
+        state: state, cb: clipboard, line: ln, onkey: onkey})
         text = [revisions]
         clipboard = "";
     }
     else if (diff[0][0] === -1) {
             change = "deletion";
             changemade = difference(text[0], revisions)
-            postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-             state: state, cb: clipboard, line: ln})
+            postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
+             state: state, cb: clipboard, line: ln, onkey: onkey})
             text = [revisions]
     }
     else if (diff[0][1] === '\n' || diff[0][1] === ' ') {
         change = "addition";
         changemade = difference(text[0], revisions)
-        postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-         state: state, cb: clipboard, line: ln})
+        postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
+         state: state, cb: clipboard, line: ln, onkey: onkey})
         text = [revisions]
     }
-    else if (diff.length < 2 && (state== 0 || state == 4)) {
+    else if ((diff.length < 2 && diff[0][0] == 0) && (state== 0 || state == 4)) {
         change = "no change";  //TODO: resolve issue, "no change" may also suggest movement to a new line
     }
     else {
         if (state == 1 || state == 2) {
             change = "cut/copy";
-            postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: diff,
-            state: state, cb: clipboard, line: ln, copyLineNumbers:copyLineNumbers})
+            postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: diff,
+            state: state, cb: clipboard, line: ln, copyLineNumbers:copyLineNumbers, onkey: onkey})
             text = [revisions]
             clipboard = "";
+        }
+        else if(diff[0][0] === 1 && state == 4) {
+            change = "addition";
+            changemade = difference(writerText, revisions)
+            postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
+            state: state, cb: clipboard, line: ln, onkey: onkey})
         }
         else if(diff[1][0] === -1) {
             change = "deletion";
 
-            if ((diff[1][1] == '\n' || diff[1][1].includes(' '))|| state != 0){
+            if ((diff[1][1].includes('\n') || diff[1][1].includes(' '))|| state != 0 || diff.length > 3){
                // if user delete a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
-                postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-                state: state, cb: clipboard, line: ln})
+                postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
+                state: state, cb: clipboard, line: ln, onkey: onkey})
                 text = [revisions]
             }
         }
         else if (diff[1][0] === 1){
             change = "addition";
-            if ((diff[1][1] == '\n' || diff[1][1].includes(' ')) || state != 0){
+            if ((diff[1][1].includes('\n') || diff[1][1].includes(' ')) || state != 0 || diff.length > 3){
                 // if user add a space, the chars array will be send to the backend for processing
                 changemade = difference(text[0], revisions)
-                postWriterText({timestamp: time, project: projectID, file: filename, text: revisions, revision: changemade,
-                state: state, cb: clipboard, line: ln})
+                postWriterText({timestamp: time, username: username, project: projectID, file: filename, text: revisions, revision: changemade,
+                state: state, cb: clipboard, line: ln, onkey:onkey})
                 text = [revisions]
             }
         }
@@ -227,40 +278,48 @@ function trackWriterAction(state, writerText, revisions, ln) {
 
 async function postWriterText(activity) {
     console.log(activity);
-    await fetch(serverURL + "/ReWARD/activity", {
-            mode: 'no-cors',
+    try {
+        const response = await fetch(serverURL + "/ReWARD/activity", {
+            // mode: 'no-cors',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
             method: 'POST',
             body: JSON.stringify(activity),
-        }, async function (err, resp, body) {
-            const message = await resp.json();
-            console.log(message);
-            if (err) {
-                console.log('Could not post writer actions.');
-                console.log(err);
-            }
+        })
+        const message = await response.json();
+        console.log(message);
+        if (response.ok && message.status == "ChatGPT"){
+            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+                chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.suggestion, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html, explanation: message.explanation}, function (response) {
+                });
+            });
         }
-    );
+    }
+    catch (err){
+        console.log('failed to fetch');
+    }
 }
 
-async function generateText() {
-    console.log("from main.py:");
-    const response = await fetch(serverURL + "/ReWARD/activity", {
-        mode: 'no-cors',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        method: 'GET',
-    });
-    console.log("from main.py:");
-    const message = await response.json();
-    console.log("from main.py:",message.status);
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.status, same_line_before: message.same_line_before, same_line_after: message.same_line_after}, function (response) {
-        });
-    });
-}
+//async function generateText(activity) {
+//    console.log(activity);
+//    const response = await fetch(serverURL + "/ReWARD/activity", {
+//        mode: 'no-cors',
+//        headers: {
+//            'Accept': 'application/json',
+//            'Content-Type': 'application/json'
+//        },
+//        method: 'GET',
+//        body: JSON.stringify(activity),
+//    }, async function (err, resp, body) {
+//        console.log("from main.py:");
+//        const message = await resp.json();
+//        console.log("from main.py:",message.status);
+//        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+//            chrome.tabs.sendMessage(tabs[0].id, {source: "chatgpt", suggestion: message.status, same_line_before: message.same_line_before, same_line_after: message.same_line_after, diffs_html: message.diffs_html}, function (response) {
+//            });
+//        });
+//    });
+//    return true;
+//}

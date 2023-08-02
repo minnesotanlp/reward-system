@@ -5,7 +5,7 @@
         <link rel="stylesheet" href="style.css">
          <style>
             html {
-                height: 100px;
+                max-height: 275px;
                 width: 300px;
             }
         </style>
@@ -21,5 +21,27 @@
                 <span class="slider round"></span>
             </label>
         </div>
+        <div class="divider" style="height: 0.5px"></div>
+         <div id = "urlForm" style="display:block">
+          <input type="text" id="serverURL" placeholder="Enter Server URL" required>
+          <button type="submit" id="sendURL">Send URL</button>
+        </div>
+         <div class="divider"></div>
+        <div id = "loginForm" style="display:block">
+          <input type="text" id="username" placeholder="Enter your username" required>
+          <input type="password" id="password" placeholder="Enter your password" required>
+          <button type="submit" id="log">Login</button>
+           <p id="gr">New user? Register here!</p>
+        </div>
+         <div id = "regForm" style="display:none">
+          <input type="text" id="newUser" placeholder="Enter your username" required>
+          <input type="password" id="newPass" placeholder="Enter your password" required>
+           <input type="password" id="confirmPass" placeholder="Confirm your password" required>
+          <button type="submit" id="reg">Register</button>
+          <p id="gl">Already a user? Login here!</p>
+        </div>
+        <div id="welcomeMessage" style="display:none">
+        </div>
+        <button type="submit" id="lo" style="display:none">Logout</button>
     </body>
 </html>

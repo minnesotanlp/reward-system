@@ -1,4 +1,4 @@
-.sliderWrapper{display: inline-block; margin:24px 24px 24px 24px;postion:relative;}
+.sliderWrapper{display: inline-block; margin:24px 24px 0px 24px;postion:relative;}
 .sliderWrapper div{display: inline-block;}
  /* The switch - the box around the slider */
 .reward {
@@ -17,7 +17,7 @@
 .switch {
   position: relative;
   display: inline-block;
-  padding:0px;
+  padding: 0px;
   vertical-align:middle;
   width: 54px;
   height: 28px;
@@ -60,3 +60,77 @@
 input:checked + .slider {background-color: #1fb5ad;}
 input:focus + .slider {box-shadow: 0 0 1px #1fb5ad;}
 input:checked + .slider:before {-webkit-transform: translateX(26px);-ms-transform: translateX(26px);transform: translateX(26px);}
+
+
+label {
+  font-weight: bold;
+}
+
+.divider {
+  height: 1px;
+  background-color: #999;
+  margin: 20px 0;
+}
+
+input[type="text"],
+input[type="password"] {
+  width: 90%;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+#serverURL{
+  margin-bottom: 0px;
+}
+
+#urlForm {
+  display: flex;
+  align-items: center;
+}
+
+#serverURL {
+  width: 60%;
+}
+
+#sendURL{
+  width: 30%;
+}
+
+button {
+  font-size: 15px;
+  width: 100%;
+  padding: 10px;
+  background-color: #4CAF50;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+#welcomeMessage {
+  display: none;
+  text-align: center;
+  font-size: 24px;
+  margin-top: 20px;
+}
+
+#lo{
+  margin-top: 30px;
+}
+
+p{
+  margin: 5px;
+  font-size: 14px;
+  text-decoration: underline;
+  color: blue;
+}
+
+p:hover {
+  color: darkblue;
+}
